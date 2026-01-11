@@ -25,10 +25,17 @@ if ! command -v claude &> /dev/null; then
     echo -e "${YELLOW}Warning: 'claude' command not found. Please install Claude Code first:${NC}"
     echo "  curl -fsSL https://claude.ai/install.sh | bash"
     echo ""
-    read -p "Continue anyway? (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit 1
+    # Check if running interactively (stdin is a terminal)
+    if [ -t 0 ]; then
+        read -p "Continue anyway? (y/N) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
+    else
+        # Non-interactive mode (piped from curl) - continue with installation
+        echo -e "${YELLOW}Non-interactive mode detected. Continuing installation...${NC}"
+        echo -e "${YELLOW}You can install Claude Code later with: curl -fsSL https://claude.ai/install.sh | bash${NC}"
     fi
 else
     echo -e "${GREEN}✓ Claude Code found${NC}"
@@ -1048,15 +1055,21 @@ echo ""
 echo -e "${YELLOW}Security Note:${NC} Silent updates download and execute code from GitHub."
 echo "  You can always manually update using /update command instead."
 echo ""
-read -p "Enable silent auto-updates? (y/N) " -n 1 -r
-echo
 
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    ENABLE_SILENT_UPDATE="true"
-    echo -e "${GREEN}✓ Silent auto-updates enabled${NC}"
+if [ -t 0 ]; then
+    read -p "Enable silent auto-updates? (y/N) " -n 1 -r
+    echo
+
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        ENABLE_SILENT_UPDATE="true"
+        echo -e "${GREEN}✓ Silent auto-updates enabled${NC}"
+    else
+        ENABLE_SILENT_UPDATE="false"
+        echo -e "${GREEN}✓ Silent auto-updates disabled (use /update to update manually)${NC}"
+    fi
 else
     ENABLE_SILENT_UPDATE="false"
-    echo -e "${GREEN}✓ Silent auto-updates disabled (use /update to update manually)${NC}"
+    echo -e "${GREEN}✓ Silent auto-updates disabled (non-interactive mode, use /update to update manually)${NC}"
 fi
 
 # Save configuration
