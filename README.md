@@ -179,8 +179,7 @@ The installer adds to your Claude Code config (`~/.claude/`):
 │   ├── prometheus.md       # /prometheus command
 │   ├── orchestrator.md     # /orchestrator command
 │   ├── ralph-loop.md       # /ralph-loop command
-│   ├── cancel-ralph.md     # /cancel-ralph command
-│   └── update.md           # /update command
+│   └── cancel-ralph.md     # /cancel-ralph command
 ├── skills/
 │   ├── ultrawork/SKILL.md  # Maximum performance mode
 │   ├── git-master/SKILL.md # Git expert skill
@@ -213,7 +212,6 @@ claude
 | `/orchestrator <task>` | Complex multi-step task coordination |
 | `/ralph-loop <task>` | Self-referential loop until task completion |
 | `/cancel-ralph` | Cancel active Ralph Loop |
-| `/update` | Check for and install updates |
 
 ### Examples
 
@@ -266,10 +264,7 @@ Features:
 - **Concurrent-safe**: Lock file prevents simultaneous update attempts
 - **Cross-platform**: Works on both macOS and Linux
 
-To manually check for updates:
-```bash
-/update
-```
+To manually update, re-run the plugin install command or use Claude Code's built-in update mechanism.
 
 ---
 
@@ -614,8 +609,8 @@ The original oh-my-opencode used multiple AI providers. This project uses Claude
 | **18 Lifecycle Hooks** | rules-injector, sisyphus-orchestrator, auto-slash-command, keyword-detector, ralph-loop, todo-continuation, context-window-limit-recovery, preemptive-compaction, session-recovery, directory-readme-injector, comment-checker, thinking-block-validator, empty-message-sanitizer, edit-error-recovery, non-interactive-env, agent-usage-reminder, background-notification, think-mode |
 | **6 Builtin Skills** | sisyphus, orchestrator, ultrawork, ralph-loop, frontend-ui-ux, git-master |
 | **Magic Keywords** | `ultrawork`, `search`, `analyze`, `ultrathink` trigger enhanced modes |
-| **Slash Commands** | `/sisyphus`, `/sisyphus-default`, `/ultrawork`, `/deepsearch`, `/analyze`, `/plan`, `/review`, `/prometheus`, `/orchestrator`, `/ralph-loop`, `/cancel-ralph`, `/update` |
-| **Auto-Update System** | Silent background updates with manual `/update` command |
+| **Slash Commands** | `/sisyphus`, `/sisyphus-default`, `/ultrawork`, `/deepsearch`, `/analyze`, `/plan`, `/review`, `/prometheus`, `/orchestrator`, `/ralph-loop`, `/cancel-ralph` |
+| **Auto-Update System** | Updates via Claude Code's plugin system |
 | **Configuration System** | JSONC config with multi-source merging |
 | **Context Injection** | Auto-loads CLAUDE.md and AGENTS.md files |
 | **Continuation Enforcement** | System prompt and hooks enforce task completion |

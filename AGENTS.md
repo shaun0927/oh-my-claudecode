@@ -209,7 +209,6 @@ Settings live in `~/.claude/settings.json`:
 | `/orchestrator <task>` | Complex task coordination |
 | `/deepsearch <query>` | Thorough codebase search |
 | `/analyze <target>` | Deep analysis |
-| `/update` | Check for updates |
 
 ## COMPLEXITY HOTSPOTS
 
