@@ -7,7 +7,7 @@
  * Ported from oh-my-opencode's keyword-detector hook.
  */
 
-export type KeywordType = 'ultrawork' | 'ultrathink' | 'search' | 'analyze';
+export type KeywordType = 'ralph' | 'ultrawork' | 'ultrathink' | 'search' | 'analyze';
 
 export interface DetectedKeyword {
   type: KeywordType;
@@ -19,6 +19,7 @@ export interface DetectedKeyword {
  * Keyword patterns for each mode
  */
 const KEYWORD_PATTERNS: Record<KeywordType, RegExp> = {
+  ralph: /\b(ralph|don't stop|must complete|until done)\b/i,
   ultrawork: /\b(ultrawork|ulw)\b/i,
   ultrathink: /\b(ultrathink|think)\b/i,
   search: /\b(search|find|locate|lookup|explore|discover|scan|grep|query|browse|detect|trace|seek|track|pinpoint|hunt)\b|where\s+is|show\s+me|list\s+all/i,
@@ -29,7 +30,7 @@ const KEYWORD_PATTERNS: Record<KeywordType, RegExp> = {
  * Priority order for keyword detection
  * Higher priority keywords take precedence
  */
-const KEYWORD_PRIORITY: KeywordType[] = ['ultrawork', 'ultrathink', 'search', 'analyze'];
+const KEYWORD_PRIORITY: KeywordType[] = ['ralph', 'ultrawork', 'ultrathink', 'search', 'analyze'];
 
 /**
  * Remove code blocks from text to prevent false positives

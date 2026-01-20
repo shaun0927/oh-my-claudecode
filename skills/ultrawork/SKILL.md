@@ -35,6 +35,10 @@ This skill enhances Claude's capabilities by:
 | **Visual** | - | `vision` | - |
 | **Planning** | - | - | `planner`, `critic`, `analyst` |
 | **Testing** | - | `qa-tester` | - |
+| **Security** | `security-reviewer-low` | - | `security-reviewer` |
+| **Build** | `build-fixer-low` | `build-fixer` | - |
+| **TDD** | `tdd-guide-low` | `tdd-guide` | - |
+| **Code Review** | `code-reviewer-low` | - | `code-reviewer` |
 
 ### Tier Selection Guide
 

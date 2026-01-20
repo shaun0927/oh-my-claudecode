@@ -14,7 +14,7 @@
  */
 
 import { detectKeywordsWithType, removeCodeBlocks } from './keyword-detector/index.js';
-import { readRalphState, incrementRalphIteration, clearRalphState, detectCompletionPromise } from './ralph-loop/index.js';
+import { readRalphState, incrementRalphIteration, clearRalphState, detectCompletionPromise, createRalphLoopHook } from './ralph-loop/index.js';
 import { addBackgroundTask, completeBackgroundTask } from '../hud/background-tasks.js';
 import {
   readVerificationState,
@@ -32,6 +32,23 @@ import {
   ANALYZE_MESSAGE,
   TODO_CONTINUATION_PROMPT
 } from '../installer/hooks.js';
+
+export const RALPH_MESSAGE = `[RALPH + ULTRAWORK MODE ACTIVATED]
+
+Ralph mode auto-activates Ultrawork for maximum parallel execution. Follow these rules:
+
+### Parallel Execution
+- **PARALLEL**: Fire independent calls simultaneously - NEVER wait sequentially
+- **BACKGROUND FIRST**: Use Task(run_in_background=true) for long operations
+- **DELEGATE**: Route tasks to specialist agents immediately
+
+### Completion Requirements
+- Verify ALL requirements from the original task are met
+- When FULLY complete, output: <promise>TASK_COMPLETE</promise>
+- Architect verification is MANDATORY before claiming completion
+
+Continue working until the task is truly done.
+`;
 
 /**
  * Input format from Claude Code hooks (via stdin)
@@ -126,11 +143,25 @@ function processKeywordDetector(input: HookInput): HookOutput {
     return { continue: true };
   }
 
-  // Priority: ultrawork > ultrathink > search > analyze
+  // Priority: ralph > ultrawork > ultrathink > search > analyze
+  const hasRalph = keywords.some(k => k.type === 'ralph');
   const hasUltrawork = keywords.some(k => k.type === 'ultrawork');
   const hasUltrathink = keywords.some(k => k.type === 'ultrathink');
   const hasSearch = keywords.some(k => k.type === 'search');
   const hasAnalyze = keywords.some(k => k.type === 'analyze');
+
+  if (hasRalph) {
+    // Activate ralph state which also auto-activates ultrawork
+    const sessionId = input.sessionId;
+    const directory = input.directory || process.cwd();
+    const hook = createRalphLoopHook(directory);
+    hook.startLoop(sessionId || 'cli-session', promptText);
+
+    return {
+      continue: true,
+      message: RALPH_MESSAGE
+    };
+  }
 
   if (hasUltrawork) {
     // Activate persistent ultrawork state
