@@ -166,14 +166,14 @@ async function main() {
     const todosDir = join(homedir(), '.claude', 'todos');
 
     // Check for ultrawork state
-    let ultraworkState = readJsonFile(join(directory, '.omc', 'ultrawork-state.json'))
-      || readJsonFile(join(homedir(), '.claude', 'ultrawork-state.json'));
+    let ultraworkState = readJsonFile(join(directory, '.omc', 'state', 'ultrawork-state.json'))
+      || readJsonFile(join(homedir(), '.omc', 'state', 'ultrawork-state.json'));
 
     // Check for ralph loop state
-    const ralphState = readJsonFile(join(directory, '.omc', 'ralph-state.json'));
+    const ralphState = readJsonFile(join(directory, '.omc', 'state', 'ralph-state.json'));
 
     // Check for verification state
-    const verificationState = readJsonFile(join(directory, '.omc', 'ralph-verification.json'));
+    const verificationState = readJsonFile(join(directory, '.omc', 'state', 'ralph-verification.json'));
 
     // Count incomplete todos
     const incompleteCount = countIncompleteTodos(todosDir, directory);
@@ -256,7 +256,7 @@ ${verificationState.oracle_feedback}
       if (iteration < maxIter) {
         const newIter = iteration + 1;
         ralphState.iteration = newIter;
-        writeJsonFile(join(directory, '.omc', 'ralph-state.json'), ralphState);
+        writeJsonFile(join(directory, '.omc', 'state', 'ralph-state.json'), ralphState);
 
         // Build continuation message with PRD context if available
         let prdContext = '';
@@ -349,7 +349,7 @@ ${ralphState.prompt ? `Original task: ${ralphState.prompt}` : ''}
       ultraworkState.reinforcement_count = newCount;
       ultraworkState.last_checked_at = new Date().toISOString();
 
-      writeJsonFile(join(directory, '.omc', 'ultrawork-state.json'), ultraworkState);
+      writeJsonFile(join(directory, '.omc', 'state', 'ultrawork-state.json'), ultraworkState);
 
       console.log(JSON.stringify({
         continue: false,

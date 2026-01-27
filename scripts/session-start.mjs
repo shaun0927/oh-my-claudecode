@@ -92,8 +92,8 @@ async function main() {
     }
 
     // Check for ultrawork state
-    const ultraworkState = readJsonFile(join(directory, '.omc', 'ultrawork-state.json'))
-      || readJsonFile(join(homedir(), '.claude', 'ultrawork-state.json'));
+    const ultraworkState = readJsonFile(join(directory, '.omc', 'state', 'ultrawork-state.json'))
+      || readJsonFile(join(homedir(), '.omc', 'state', 'ultrawork-state.json'));
 
     if (ultraworkState?.active) {
       messages.push(`<session-restore>
@@ -112,7 +112,7 @@ Continue working in ultrawork mode until all tasks are complete.
     }
 
     // Check for ralph loop state
-    const ralphState = readJsonFile(join(directory, '.omc', 'ralph-state.json'));
+    const ralphState = readJsonFile(join(directory, '.omc', 'state', 'ralph-state.json'));
     if (ralphState?.active) {
       messages.push(`<session-restore>
 

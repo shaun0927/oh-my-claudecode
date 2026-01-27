@@ -137,15 +137,15 @@ function activateUltraworkState(directory, prompt) {
     last_checked_at: new Date().toISOString()
   };
 
-  // Write to local .sisyphus directory
-  const localDir = join(directory, '.omc');
+  // Write to local .omc/state directory
+  const localDir = join(directory, '.omc', 'state');
   if (!existsSync(localDir)) {
     try { mkdirSync(localDir, { recursive: true }); } catch {}
   }
   try { writeFileSync(join(localDir, 'ultrawork-state.json'), JSON.stringify(state, null, 2)); } catch {}
 
-  // Write to global .claude directory
-  const globalDir = join(homedir(), '.claude');
+  // Write to global .omc/state directory
+  const globalDir = join(homedir(), '.omc', 'state');
   if (!existsSync(globalDir)) {
     try { mkdirSync(globalDir, { recursive: true }); } catch {}
   }
