@@ -15,8 +15,8 @@
 
 import { detectKeywordsWithType, removeCodeBlocks } from './keyword-detector/index.js';
 import { readRalphState, incrementRalphIteration, clearRalphState, detectCompletionPromise, createRalphLoopHook } from './ralph/index.js';
-import { processOrchestratorPreTool } from './omc-orchestrator/index.js';
 import { addBackgroundTask, completeBackgroundTask } from '../hud/background-tasks.js';
+import { processPreToolUse as enforceDelegation, isAgentCall } from '../features/delegation-enforcer.js';
 import {
   readVerificationState,
   startVerification,
@@ -41,30 +41,6 @@ import {
   TODO_CONTINUATION_PROMPT,
   RALPH_MESSAGE
 } from '../installer/hooks.js';
-
-// New async hook imports
-import {
-  processSubagentStart,
-  processSubagentStop,
-  type SubagentStartInput,
-  type SubagentStopInput
-} from './subagent-tracker/index.js';
-import {
-  processPreCompact,
-  type PreCompactInput
-} from './pre-compact/index.js';
-import {
-  processSetup,
-  type SetupInput
-} from './setup/index.js';
-import {
-  handlePermissionRequest,
-  type PermissionRequestInput
-} from './permission-handler/index.js';
-import {
-  handleSessionEnd,
-  type SessionEndInput
-} from './session-end/index.js';
 
 /**
  * Input format from Claude Code hooks (via stdin)
@@ -116,16 +92,9 @@ export type HookType =
   | 'ralph'
   | 'persistent-mode'
   | 'session-start'
-  | 'session-end'          // NEW: Cleanup and metrics on session end
   | 'pre-tool-use'
   | 'post-tool-use'
-  | 'autopilot'
-  | 'subagent-start'       // NEW: Track agent spawns
-  | 'subagent-stop'        // NEW: Verify agent completion
-  | 'pre-compact'          // NEW: Save state before compaction
-  | 'setup-init'           // NEW: One-time initialization
-  | 'setup-maintenance'    // NEW: Periodic maintenance
-  | 'permission-request';  // NEW: Smart auto-approval
+  | 'autopilot';
 
 /**
  * Extract prompt text from various input formats
@@ -447,37 +416,24 @@ Please continue working on these tasks.
 
 /**
  * Process pre-tool-use hook
- * Checks delegation enforcement and tracks background tasks
+ * Tracks background tasks when Task tool is invoked
+ * Enforces model parameter for agent delegation calls
  */
 function processPreToolUse(input: HookInput): HookOutput {
   const directory = input.directory || process.cwd();
-
-  // Check delegation enforcement FIRST
-  const enforcementResult = processOrchestratorPreTool({
-    toolName: input.toolName || '',
-    toolInput: (input.toolInput as Record<string, unknown>) || {},
-    sessionId: input.sessionId,
-    directory,
-  });
-
-  // If enforcement blocks, return immediately
-  if (!enforcementResult.continue) {
-    return {
-      continue: false,
-      reason: enforcementResult.reason,
-      message: enforcementResult.message,
-    };
-  }
+  let modifiedInput = input.toolInput;
 
   // Track Task tool invocations for HUD background tasks display
-  if (input.toolName === 'Task') {
+  if (input.toolName === 'Task' || input.toolName === 'Agent') {
     const toolInput = input.toolInput as {
       description?: string;
       subagent_type?: string;
       run_in_background?: boolean;
     } | undefined;
 
+    // Only track if running in background or likely to take a while
     if (toolInput?.description) {
+      // Generate a pseudo-ID from the description hash (tool_use_id not available in pre-hook)
       const taskId = `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       addBackgroundTask(
         taskId,
@@ -486,12 +442,22 @@ function processPreToolUse(input: HookInput): HookOutput {
         directory
       );
     }
+
+    // Enforce model parameter for agent delegation calls
+    if (input.toolName && isAgentCall(input.toolName, input.toolInput)) {
+      try {
+        const result = enforceDelegation(input.toolName, input.toolInput);
+        modifiedInput = result.modifiedInput;
+      } catch (error) {
+        // Log error but don't block - let Claude Code handle unknown agents
+        if (process.env.OMC_DEBUG === 'true') {
+          console.warn(`[OMC] Delegation enforcement error: ${error}`);
+        }
+      }
+    }
   }
 
-  // Return enforcement message if present (warning), otherwise continue silently
-  return enforcementResult.message
-    ? { continue: true, message: enforcementResult.message }
-    : { continue: true };
+  return { continue: true, modifiedInput };
 }
 
 /**
@@ -580,36 +546,6 @@ export async function processHook(
 
       case 'autopilot':
         return processAutopilot(input);
-
-      // New async hook types
-      case 'session-end':
-        return await handleSessionEnd(input as unknown as SessionEndInput);
-
-      case 'subagent-start':
-        return processSubagentStart(input as unknown as SubagentStartInput);
-
-      case 'subagent-stop':
-        return processSubagentStop(input as unknown as SubagentStopInput);
-
-      case 'pre-compact':
-        return await processPreCompact(input as unknown as PreCompactInput);
-
-      case 'setup-init':
-        return await processSetup({
-          ...input,
-          trigger: 'init',
-          hook_event_name: 'Setup'
-        } as unknown as SetupInput);
-
-      case 'setup-maintenance':
-        return await processSetup({
-          ...input,
-          trigger: 'maintenance',
-          hook_event_name: 'Setup'
-        } as unknown as SetupInput);
-
-      case 'permission-request':
-        return await handlePermissionRequest(input as unknown as PermissionRequestInput);
 
       default:
         return { continue: true };
