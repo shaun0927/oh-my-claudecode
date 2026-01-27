@@ -81,6 +81,7 @@ Then, use the Write tool to create `~/.claude/hud/omc-hud.mjs` with this exact c
 import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 async function main() {
   const home = homedir();
@@ -92,11 +93,11 @@ async function main() {
     try {
       const versions = readdirSync(pluginCacheBase);
       if (versions.length > 0) {
-        const latestVersion = versions.sort().reverse()[0];
+        const latestVersion = versions.sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).reverse()[0];
         pluginCacheDir = join(pluginCacheBase, latestVersion);
         const pluginPath = join(pluginCacheDir, "dist/hud/index.js");
         if (existsSync(pluginPath)) {
-          await import(pluginPath);
+          await import(pathToFileURL(pluginPath).href);
           return;
         }
       }
@@ -114,7 +115,7 @@ async function main() {
   for (const devPath of devPaths) {
     if (existsSync(devPath)) {
       try {
-        await import(devPath);
+        await import(pathToFileURL(devPath).href);
         return;
       } catch { /* continue */ }
     }
@@ -138,12 +139,24 @@ chmod +x ~/.claude/hud/omc-hud.mjs
 
 **Step 4:** Update settings.json to use the HUD:
 
-Read `~/.claude/settings.json`, then update/add the `statusLine` field:
+Read `~/.claude/settings.json`, then update/add the `statusLine` field.
+
+**macOS/Linux:**
 ```json
 {
   "statusLine": {
     "type": "command",
     "command": "node ~/.claude/hud/omc-hud.mjs"
+  }
+}
+```
+
+**Windows:** (Use `%USERPROFILE%` or absolute path - Node.js doesn't expand `~`)
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "node %USERPROFILE%\\.claude\\hud\\omc-hud.mjs"
   }
 }
 ```

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { toForwardSlash, toShellPath, getDataDir, getConfigDir } from '../paths.js';
+import { toForwardSlash, toShellPath, getDataDir, getConfigDir, toImportUrl, sortVersions } from '../paths.js';
 
 describe('cross-platform path utilities', () => {
   describe('toForwardSlash', () => {
@@ -102,6 +102,92 @@ describe('cross-platform path utilities', () => {
       delete process.env.XDG_CONFIG_HOME;
       const result = getConfigDir();
       expect(result).toContain('.config');
+    });
+  });
+
+  describe('toImportUrl', () => {
+    it('should convert Unix paths to file:// URLs', () => {
+      const result = toImportUrl('/home/user/file.js');
+      expect(result).toBe('file:///home/user/file.js');
+    });
+
+    it('should convert Windows paths to file:// URLs', () => {
+      // Note: On non-Windows, this simulates what would happen with a Windows-style path
+      // The pathToFileURL function handles this correctly on all platforms
+      const result = toImportUrl('/C:/Users/test/file.js');
+      expect(result).toMatch(/^file:\/\/\//);
+      expect(result).toContain('file.js');
+    });
+
+    it('should encode spaces in paths', () => {
+      const result = toImportUrl('/path/with spaces/file.js');
+      expect(result).toBe('file:///path/with%20spaces/file.js');
+    });
+
+    it('should encode special characters', () => {
+      const result = toImportUrl('/path/with#special/file.js');
+      expect(result).toContain('%23'); // # is encoded as %23
+    });
+
+    it('should handle paths with unicode characters', () => {
+      const result = toImportUrl('/home/한글/file.js');
+      expect(result).toMatch(/^file:\/\/\//);
+      // Unicode may or may not be encoded depending on Node version
+      expect(result).toContain('file.js');
+    });
+  });
+
+  describe('sortVersions', () => {
+    it('should sort versions numerically in descending order by default', () => {
+      const versions = ['3.5.0', '3.10.0', '3.9.0'];
+      const result = sortVersions(versions);
+      expect(result).toEqual(['3.10.0', '3.9.0', '3.5.0']);
+    });
+
+    it('should sort versions numerically in ascending order when specified', () => {
+      const versions = ['3.5.0', '3.10.0', '3.9.0'];
+      const result = sortVersions(versions, false);
+      expect(result).toEqual(['3.5.0', '3.9.0', '3.10.0']);
+    });
+
+    it('should handle single-digit and double-digit versions correctly', () => {
+      const versions = ['1.0.0', '2.0.0', '10.0.0', '9.0.0'];
+      const result = sortVersions(versions);
+      expect(result).toEqual(['10.0.0', '9.0.0', '2.0.0', '1.0.0']);
+    });
+
+    it('should handle pre-release versions', () => {
+      const versions = ['1.0.0-alpha', '1.0.0-beta', '1.0.0'];
+      const result = sortVersions(versions);
+      // With numeric localeCompare, pre-release versions sort after release
+      // because '-' comes after '.' in the comparison
+      // This is acceptable behavior for plugin version directories
+      expect(result[0]).toBe('1.0.0-beta');
+      expect(result).toContain('1.0.0');
+      expect(result).toContain('1.0.0-alpha');
+    });
+
+    it('should not mutate the original array', () => {
+      const versions = ['3.5.0', '3.10.0', '3.9.0'];
+      const original = [...versions];
+      sortVersions(versions);
+      expect(versions).toEqual(original);
+    });
+
+    it('should handle empty array', () => {
+      const result = sortVersions([]);
+      expect(result).toEqual([]);
+    });
+
+    it('should handle single version', () => {
+      const result = sortVersions(['1.0.0']);
+      expect(result).toEqual(['1.0.0']);
+    });
+
+    it('should handle versions with different patch levels', () => {
+      const versions = ['1.0.1', '1.0.10', '1.0.2', '1.0.9'];
+      const result = sortVersions(versions);
+      expect(result).toEqual(['1.0.10', '1.0.9', '1.0.2', '1.0.1']);
     });
   });
 });

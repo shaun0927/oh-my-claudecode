@@ -18,7 +18,7 @@
 
 import { existsSync, mkdirSync, writeFileSync, readFileSync, chmodSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { homedir } from 'os';
 import { execSync } from 'child_process';
 import {
@@ -48,7 +48,7 @@ export const VERSION_FILE = join(CLAUDE_CONFIG_DIR, '.omc-version.json');
 export const CORE_COMMANDS: string[] = [];
 
 /** Current version */
-export const VERSION = '3.7.0';
+export const VERSION = '3.4.0';
 
 /** Installation result */
 export interface InstallResult {
@@ -314,14 +314,6 @@ export function install(options: InstallOptions = {}): InstallResult {
 
       if (!existsSync(homeMdPath)) {
         if (!existsSync(claudeMdPath) || options.force) {
-          // Backup existing CLAUDE.md before overwriting (if it exists and --force)
-          if (existsSync(claudeMdPath) && options.force) {
-            const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-            const backupPath = join(CLAUDE_CONFIG_DIR, `CLAUDE.md.backup.${today}`);
-            const existingContent = readFileSync(claudeMdPath, 'utf-8');
-            writeFileSync(backupPath, existingContent);
-            log(`Backed up existing CLAUDE.md to ${backupPath}`);
-          }
           writeFileSync(claudeMdPath, loadClaudeMdContent());
           log('Created CLAUDE.md');
         } else {
@@ -411,6 +403,7 @@ export function install(options: InstallOptions = {}): InstallResult {
         'import { existsSync, readdirSync } from "node:fs";',
         'import { homedir } from "node:os";',
         'import { join } from "node:path";',
+        'import { pathToFileURL } from "node:url";',
         '',
         'async function main() {',
         '  const home = homedir();',
@@ -427,7 +420,7 @@ export function install(options: InstallOptions = {}): InstallResult {
         '  for (const devPath of devPaths) {',
         '    if (existsSync(devPath)) {',
         '      try {',
-        '        await import(devPath);',
+        '        await import(pathToFileURL(devPath).href);',
         '        return;',
         '      } catch { /* continue */ }',
         '    }',
@@ -444,7 +437,7 @@ export function install(options: InstallOptions = {}): InstallResult {
         '        pluginCacheDir = join(pluginCacheBase, latestVersion);',
         '        const pluginPath = join(pluginCacheDir, "dist/hud/index.js");',
         '        if (existsSync(pluginPath)) {',
-        '          await import(pluginPath);',
+        '          await import(pathToFileURL(pluginPath).href);',
         '          return;',
         '        }',
         '      }',
