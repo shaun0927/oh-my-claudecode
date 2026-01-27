@@ -40,7 +40,10 @@ const LEGACY_LOCATIONS: Record<string, string[]> = {
   'boulder': ['.omc/boulder.json', path.join(os.homedir(), '.omc', 'boulder.json')],
   'autopilot': ['.omc/autopilot-state.json'],
   'ralph': ['.omc/ralph-state.json'],
-  'ultrawork': ['.omc/ultrawork-state.json'],
+  'ralph-state': ['.omc/ralph-state.json'],
+  'ralph-verification': ['.omc/ralph-verification.json'],
+  'ultrawork': ['.omc/ultrawork-state.json', path.join(os.homedir(), '.claude', 'ultrawork-state.json')],
+  'ultrawork-state': ['.omc/ultrawork-state.json', path.join(os.homedir(), '.claude', 'ultrawork-state.json')],
   'ultraqa': ['.omc/ultraqa-state.json']
 };
 
