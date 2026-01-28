@@ -115,7 +115,9 @@ const mcpServerConfigSchema = {
 };
 
 // Compile schemas
-const ajv = new Ajv.default({ allErrors: true, strict: false });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const AjvConstructor = (Ajv as any).default ?? Ajv;
+const ajv = new AjvConstructor({ allErrors: true, strict: false });
 const validatePluginManifest: ValidateFunction = ajv.compile(pluginManifestSchema);
 const validateMcpServerConfig: ValidateFunction = ajv.compile(mcpServerConfigSchema);
 
