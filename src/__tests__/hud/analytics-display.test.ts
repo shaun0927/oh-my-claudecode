@@ -185,6 +185,13 @@ describe('renderAnalyticsLineWithConfig', () => {
       expect(parts).toHaveLength(2);
     });
   });
+
+  describe('edge cases', () => {
+    it('handles empty topAgents gracefully', () => {
+      const result = renderAnalyticsLineWithConfig({ ...baseAnalytics, topAgents: 'none' }, true, true);
+      expect(result).toContain('Top: none');
+    });
+  });
 });
 
 describe('getSessionHealthAnalyticsData', () => {
