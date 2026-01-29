@@ -102,7 +102,7 @@ export const LSP_SERVERS: Record<string, LspServerConfig> = {
     name: 'Ruby Language Server (Solargraph)',
     command: 'solargraph',
     args: ['stdio'],
-    extensions: ['.rb', '.rake', '.gemspec'],
+    extensions: ['.rb', '.rake', '.gemspec', '.erb'],
     installHint: 'gem install solargraph'
   },
   lua: {
@@ -123,7 +123,7 @@ export const LSP_SERVERS: Record<string, LspServerConfig> = {
     name: 'ElixirLS',
     command: 'elixir-ls',
     args: [],
-    extensions: ['.ex', '.exs'],
+    extensions: ['.ex', '.exs', '.heex', '.eex'],
     installHint: 'Install from https://github.com/elixir-lsp/elixir-ls'
   },
   csharp: {
@@ -203,6 +203,7 @@ export function getServerForLanguage(language: string): LspServerConfig | null {
     'rb': 'ruby',
     'rake': 'ruby',
     'gemspec': 'ruby',
+    'erb': 'ruby',
     'lua': 'lua',
     'kotlin': 'kotlin',
     'kt': 'kotlin',
@@ -210,6 +211,8 @@ export function getServerForLanguage(language: string): LspServerConfig | null {
     'elixir': 'elixir',
     'ex': 'elixir',
     'exs': 'elixir',
+    'heex': 'elixir',
+    'eex': 'elixir',
     'csharp': 'csharp',
     'c#': 'csharp',
     'cs': 'csharp'

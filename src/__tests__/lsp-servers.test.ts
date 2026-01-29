@@ -52,7 +52,10 @@ describe('getServerForFile', () => {
     ['build.gradle.kts', 'Kotlin Language Server'],
     ['app.ex', 'ElixirLS'],
     ['test.exs', 'ElixirLS'],
+    ['page.heex', 'ElixirLS'],
+    ['template.eex', 'ElixirLS'],
     ['Program.cs', 'OmniSharp'],
+    ['view.erb', 'Ruby Language Server (Solargraph)'],
   ];
 
   it.each(cases)('should resolve "%s" to "%s"', (file, expectedName) => {
@@ -95,7 +98,10 @@ describe('getServerForLanguage', () => {
     ['elixir', 'ElixirLS'],
     ['ex', 'ElixirLS'],
     ['exs', 'ElixirLS'],
+    ['heex', 'ElixirLS'],
+    ['eex', 'ElixirLS'],
     ['csharp', 'OmniSharp'],
+    ['erb', 'Ruby Language Server (Solargraph)'],
     ['c#', 'OmniSharp'],
     ['cs', 'OmniSharp'],
   ];
