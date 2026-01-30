@@ -2,7 +2,7 @@
 # PSM Session Registry Management
 
 # Add session to registry
-# Usage: psm_add_session <id> <type> <project> <ref> <branch> <base> <tmux> <worktree> <source_repo> <metadata_json>
+# Usage: psm_add_session <id> <type> <project> <ref> <branch> <base> <tmux> <worktree> <source_repo> <metadata_json> [provider] [provider_ref]
 psm_add_session() {
     local id="$1"
     local type="$2"
@@ -14,6 +14,8 @@ psm_add_session() {
     local worktree="$8"
     local source_repo="$9"
     local metadata="${10:-{}}"
+    local provider="${11:-github}"
+    local provider_ref="${12:-}"
 
     local now=$(date -Iseconds)
 
@@ -28,6 +30,8 @@ psm_add_session() {
        --arg worktree "$worktree" \
        --arg source "$source_repo" \
        --arg now "$now" \
+       --arg provider "$provider" \
+       --arg provider_ref "$provider_ref" \
        --argjson meta "$metadata" \
        '.sessions[$id] = {
           "id": $id,
@@ -42,6 +46,8 @@ psm_add_session() {
           "created_at": $now,
           "last_accessed": $now,
           "state": "active",
+          "provider": $provider,
+          "provider_ref": $provider_ref,
           "metadata": $meta
         } | .stats.total_created += 1' \
        "$PSM_SESSIONS" > "$tmp" && mv "$tmp" "$PSM_SESSIONS"
