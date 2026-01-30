@@ -25,7 +25,7 @@ Automatically detects which mode is active and cancels it:
 /oh-my-claudecode:cancel
 ```
 
-Or say: "stop", "cancel", "abort"
+Or say: "cancelomc", "stopomc"
 
 ## Auto-Detection
 

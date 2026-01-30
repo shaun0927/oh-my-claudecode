@@ -458,6 +458,24 @@ function processPreToolUse(input: HookInput): HookOutput {
     };
   }
 
+  // Warn about pkill -f self-termination risk (issue #210)
+  // Matches: pkill -f, pkill -9 -f, pkill --full, etc.
+  if (input.toolName === 'Bash') {
+    const command = (input.toolInput as { command?: string })?.command ?? '';
+    if (/\bpkill\b.*\s-f\b/.test(command) || /\bpkill\b.*--full\b/.test(command)) {
+      return {
+        continue: true,
+        message: [
+          'WARNING: `pkill -f` matches its own process command line and will self-terminate the shell (exit code 144 = SIGTERM).',
+          'Safer alternatives:',
+          '  - `pkill <exact-process-name>` (without -f)',
+          '  - `kill $(pgrep -f "pattern")` (pgrep does not kill itself)',
+          'Proceeding anyway, but the command may kill this shell session.',
+        ].join('\n'),
+      };
+    }
+  }
+
   // Track Task tool invocations for HUD background tasks display
   if (input.toolName === 'Task') {
     const toolInput = input.toolInput as {

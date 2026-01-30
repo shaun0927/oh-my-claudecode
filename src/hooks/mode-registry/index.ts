@@ -241,6 +241,16 @@ export function getActiveModes(cwd: string): ExecutionMode[] {
 }
 
 /**
+ * Check if any OMC mode is currently active
+ *
+ * @param cwd - Working directory
+ * @returns true if any mode is active
+ */
+export function isAnyModeActive(cwd: string): boolean {
+  return getActiveModes(cwd).length > 0;
+}
+
+/**
  * Get the currently active exclusive mode (if any)
  *
  * @param cwd - Working directory

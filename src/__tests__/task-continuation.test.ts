@@ -426,9 +426,12 @@ describe('Task System Support', () => {
       expect(isUserAbort(context)).toBe(true);
     });
 
-    it('should detect cancel pattern', () => {
-      const context: StopContext = { stop_reason: 'operation_cancelled' };
+    it('should detect exact cancel pattern (not substring)', () => {
+      // After issue #210 fix, 'cancel' only matches exactly, not as substring
+      const context: StopContext = { stop_reason: 'cancel' };
       expect(isUserAbort(context)).toBe(true);
+      // Compound words like operation_cancelled should NOT match
+      expect(isUserAbort({ stop_reason: 'operation_cancelled' })).toBe(false);
     });
 
     it('should be case insensitive', () => {

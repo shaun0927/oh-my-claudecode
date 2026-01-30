@@ -146,21 +146,15 @@ export function isUserAbort(context?: StopContext): boolean {
   if (context.user_requested || context.userRequested) return true;
 
   // Check stop_reason patterns indicating user abort
-  // Unified patterns: includes both specific (user_cancel) and generic (cancel)
-  const abortPatterns = [
-    'user_cancel',
-    'user_interrupt',
-    'ctrl_c',
-    'manual_stop',
-    'aborted',
-    'abort',      // generic patterns from shell/Node.js templates
-    'cancel',
-    'interrupt',
-  ];
+  // Exact-match patterns: short generic words that cause false positives with .includes()
+  const exactPatterns = ['aborted', 'abort', 'cancel', 'interrupt'];
+  // Substring patterns: compound words safe for .includes() matching
+  const substringPatterns = ['user_cancel', 'user_interrupt', 'ctrl_c', 'manual_stop'];
 
   // Support both snake_case and camelCase field names
   const reason = (context.stop_reason ?? context.stopReason ?? '').toLowerCase();
-  return abortPatterns.some(pattern => reason.includes(pattern));
+  return exactPatterns.some(p => reason === p) ||
+         substringPatterns.some(p => reason.includes(p));
 }
 
 /**

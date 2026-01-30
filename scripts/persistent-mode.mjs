@@ -155,11 +155,13 @@ function isUserAbort(data) {
   if (data.user_requested || data.userRequested) return true;
 
   const reason = (data.stop_reason || data.stopReason || '').toLowerCase();
-  const abortPatterns = [
-    'user_cancel', 'user_interrupt', 'ctrl_c', 'manual_stop',
-    'aborted', 'abort', 'cancel', 'interrupt',
-  ];
-  return abortPatterns.some(p => reason.includes(p));
+  // Exact-match patterns: short generic words that cause false positives with .includes()
+  const exactPatterns = ['aborted', 'abort', 'cancel', 'interrupt'];
+  // Substring patterns: compound words safe for .includes() matching
+  const substringPatterns = ['user_cancel', 'user_interrupt', 'ctrl_c', 'manual_stop'];
+
+  return exactPatterns.some(p => reason === p) ||
+         substringPatterns.some(p => reason.includes(p));
 }
 
 async function main() {
