@@ -54,6 +54,14 @@ describe('isOmcHook', () => {
     expect(isOmcHook('node ~/.claude/hooks/OMC-hook.mjs')).toBe(true);
     expect(isOmcHook('bash $HOME/.claude/hooks/OH-MY-CLAUDECODE.sh')).toBe(true);
   });
+
+  it('avoids false positives for words containing "omc" as substring', () => {
+    // These words contain "omc" but are not OMC-related
+    expect(isOmcHook('node atomic-formatter.mjs')).toBe(false);
+    expect(isOmcHook('bash socom-tool.sh')).toBe(false);
+    expect(isOmcHook('python telecom-api.py')).toBe(false);
+    expect(isOmcHook('/usr/bin/insomniac')).toBe(false);
+  });
 });
 
 describe('isOmcHook detection', () => {

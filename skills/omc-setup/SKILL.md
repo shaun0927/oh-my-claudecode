@@ -180,7 +180,7 @@ else
       cat "$TEMP_OMC"
       echo '<!-- OMC:END -->'
       [ -n "$AFTER_OMC" ] && printf '%s\n' "$AFTER_OMC"
-    } > "$TARGET_PATH"
+    } > "${TARGET_PATH}.tmp" && mv "${TARGET_PATH}.tmp" "$TARGET_PATH"
     echo "Updated OMC section (user customizations preserved)"
   else
     # No markers: wrap new content in markers, append old content as user section
@@ -192,7 +192,7 @@ else
       echo ""
       echo "<!-- User customizations (migrated from previous CLAUDE.md) -->"
       printf '%s\n' "$OLD_CONTENT"
-    } > "$TARGET_PATH"
+    } > "${TARGET_PATH}.tmp" && mv "${TARGET_PATH}.tmp" "$TARGET_PATH"
     echo "Migrated existing CLAUDE.md (added OMC markers, preserved old content)"
   fi
   rm -f "$TEMP_OMC"
@@ -298,7 +298,7 @@ else
       cat "$TEMP_OMC"
       echo '<!-- OMC:END -->'
       [ -n "$AFTER_OMC" ] && printf '%s\n' "$AFTER_OMC"
-    } > "$TARGET_PATH"
+    } > "${TARGET_PATH}.tmp" && mv "${TARGET_PATH}.tmp" "$TARGET_PATH"
     echo "Updated OMC section (user customizations preserved)"
   else
     # No markers: wrap new content in markers, append old content as user section
@@ -310,7 +310,7 @@ else
       echo ""
       echo "<!-- User customizations (migrated from previous CLAUDE.md) -->"
       printf '%s\n' "$OLD_CONTENT"
-    } > "$TARGET_PATH"
+    } > "${TARGET_PATH}.tmp" && mv "${TARGET_PATH}.tmp" "$TARGET_PATH"
     echo "Migrated existing CLAUDE.md (added OMC markers, preserved old content)"
   fi
   rm -f "$TEMP_OMC"

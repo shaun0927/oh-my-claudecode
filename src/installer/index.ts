@@ -72,19 +72,16 @@ export interface InstallOptions {
 /**
  * Detect whether a hook command belongs to oh-my-claudecode.
  *
- * Uses substring matching rather than word-boundary regex.
- * Rationale: Real OMC hooks use compound names where "omc" is embedded
- * (e.g., `omc-pre-tool-use.mjs`, `oh-my-claudecode-hook.mjs`). A word-boundary
- * regex like /\bomc\b/ would fail to match "oh-my-claudecode" since "omc" appears
- * as an interior substring. The theoretical false positives (words containing "omc"
- * like "atomic", "socom") are extremely unlikely in real hook command paths.
+ * Uses word-boundary regex for 'omc' to avoid false positives from words
+ * containing 'omc' as a substring (e.g., "atomic", "socom", "telecom").
+ * Uses substring matching for 'oh-my-claudecode' since it's unambiguous.
  *
  * @param command - The hook command string
- * @returns true if the command contains 'omc' or 'oh-my-claudecode'
+ * @returns true if the command contains standalone 'omc' or 'oh-my-claudecode'
  */
 export function isOmcHook(command: string): boolean {
   const lowerCommand = command.toLowerCase();
-  return lowerCommand.includes('omc') || lowerCommand.includes('oh-my-claudecode');
+  return /\bomc\b/i.test(command) || lowerCommand.includes('oh-my-claudecode');
 }
 
 /**
