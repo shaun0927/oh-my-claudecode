@@ -45,9 +45,20 @@ import {
 import {
   processSubagentStart,
   processSubagentStop,
+  getAgentDashboard,
+  getAgentObservatory,
+  recordFileOwnership,
+  suggestInterventions,
   type SubagentStartInput,
   type SubagentStopInput
 } from './subagent-tracker/index.js';
+
+import {
+  recordAgentStart,
+  recordAgentStop,
+  recordToolEvent,
+  recordFileTouch,
+} from './subagent-tracker/session-replay.js';
 import {
   processPreCompact,
   type PreCompactInput
@@ -481,6 +492,26 @@ function processPreToolUse(input: HookInput): HookOutput {
     }
   }
 
+  // Track file ownership for Edit/Write tools
+  if (input.toolName === 'Edit' || input.toolName === 'Write') {
+    const toolInput = input.toolInput as { file_path?: string } | undefined;
+    if (toolInput?.file_path && input.sessionId) {
+      // Note: We don't have agent_id here in pre-tool, file ownership is recorded elsewhere
+      // Record file touch for replay
+      recordFileTouch(directory, input.sessionId, 'orchestrator', toolInput.file_path);
+    }
+  }
+
+  // Inject agent dashboard for Task tool calls (debugging parallel agents)
+  if (input.toolName === 'Task') {
+    const dashboard = getAgentDashboard(directory);
+    if (dashboard) {
+      const baseMessage = enforcementResult.message || '';
+      const combined = baseMessage ? `${baseMessage}\n\n${dashboard}` : dashboard;
+      return { continue: true, message: combined };
+    }
+  }
+
   // Return enforcement message if present (warning), otherwise continue silently
   return enforcementResult.message
     ? { continue: true, message: enforcementResult.message }
@@ -490,9 +521,20 @@ function processPreToolUse(input: HookInput): HookOutput {
 /**
  * Process post-tool-use hook
  */
-function processPostToolUse(_input: HookInput): HookOutput {
-  // Post-tool-use hook - currently no action needed
-  // Task completion tracking would require tool_use_id which isn't reliably available
+function processPostToolUse(input: HookInput): HookOutput {
+  const directory = input.directory || process.cwd();
+
+  // After Task completion, show updated agent dashboard
+  if (input.toolName === 'Task') {
+    const dashboard = getAgentDashboard(directory);
+    if (dashboard) {
+      return {
+        continue: true,
+        message: dashboard
+      };
+    }
+  }
+
   return { continue: true };
 }
 
@@ -603,7 +645,18 @@ export async function processHook(
           console.error('[hook-bridge] Invalid SubagentStartInput - missing required fields');
           return { continue: true };
         }
-        return processSubagentStart(input as SubagentStartInput);
+        const startInput = input as SubagentStartInput;
+        // Record to session replay
+        recordAgentStart(
+          startInput.cwd,
+          startInput.session_id,
+          startInput.agent_id,
+          startInput.agent_type,
+          startInput.prompt,
+          undefined, // parentMode detected in tracker
+          startInput.model
+        );
+        return processSubagentStart(startInput);
       }
 
       case 'subagent-stop': {
@@ -611,7 +664,17 @@ export async function processHook(
           console.error('[hook-bridge] Invalid SubagentStopInput - missing required fields');
           return { continue: true };
         }
-        return processSubagentStop(input as SubagentStopInput);
+        const stopInput = input as SubagentStopInput;
+        const result = processSubagentStop(stopInput);
+        // Record to session replay
+        recordAgentStop(
+          stopInput.cwd,
+          stopInput.session_id,
+          stopInput.agent_id,
+          stopInput.agent_type,
+          stopInput.success
+        );
+        return result;
       }
 
       case 'pre-compact': {
