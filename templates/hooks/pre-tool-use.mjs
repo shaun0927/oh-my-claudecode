@@ -5,6 +5,14 @@
  */
 
 import * as path from 'path';
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Dynamic import for the shared stdin module
+const { readStdin } = await import(path.join(__dirname, 'lib', 'stdin.mjs'));
 
 // Allowed path patterns (no warning)
 const ALLOWED_PATH_PATTERNS = [
@@ -70,12 +78,7 @@ This is a soft warning. Operation will proceed.`;
 }
 
 async function main() {
-  let input = '';
-
-  // Read stdin
-  for await (const chunk of process.stdin) {
-    input += chunk;
-  }
+  const input = await readStdin();
 
   let data;
   try {

@@ -4,7 +4,14 @@
 // Saves to .omc/notepad.md for compaction-resilient memory
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Dynamic import for the shared stdin module
+const { readStdin } = await import(join(__dirname, 'lib', 'stdin.mjs'));
 
 // Constants
 const NOTEPAD_TEMPLATE = '# Notepad\n' +
@@ -15,15 +22,6 @@ const NOTEPAD_TEMPLATE = '# Notepad\n' +
   '<!-- Session notes. Auto-pruned after 7 days. -->\n\n' +
   '## MANUAL\n' +
   '<!-- User content. Never auto-pruned. -->\n';
-
-// Read all stdin
-async function readStdin() {
-  const chunks = [];
-  for await (const chunk of process.stdin) {
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks).toString('utf-8');
-}
 
 // Initialize notepad.md if needed
 function initNotepad(directory) {

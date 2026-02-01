@@ -4,16 +4,15 @@
 // Cross-platform: Windows, macOS, Linux
 
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { homedir } from 'os';
+import { fileURLToPath } from 'url';
 
-async function readStdin() {
-  const chunks = [];
-  for await (const chunk of process.stdin) {
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks).toString('utf-8');
-}
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Dynamic import for the shared stdin module
+const { readStdin } = await import(join(__dirname, 'lib', 'stdin.mjs'));
 
 function readJsonFile(path) {
   try {
