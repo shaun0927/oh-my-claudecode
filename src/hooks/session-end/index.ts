@@ -342,24 +342,5 @@ export async function processSessionEnd(input: SessionEndInput): Promise<HookOut
  * Main hook entry point
  */
 export async function handleSessionEnd(input: SessionEndInput): Promise<HookOutput> {
-  // Record and export session metrics to disk
-  const metrics = recordSessionMetrics(input.cwd, input);
-  exportSessionSummary(input.cwd, metrics);
-
-  // Clean up transient state files
-  cleanupTransientState(input.cwd);
-
-  // Clean up mode state files to prevent stale state issues
-  // This ensures the stop hook won't malfunction in subsequent sessions
-  // Pass session_id to only clean up this session's states
-  cleanupModeStates(input.cwd, input.session_id);
-
-  // Trigger configured stop hook callbacks (file/telegram/discord)
-  await triggerStopCallbacks(metrics, {
-    session_id: input.session_id,
-    cwd: input.cwd,
-  });
-
-  // Return simple response - metrics are persisted to .omc/sessions/
-  return { continue: true };
+  return processSessionEnd(input);
 }
