@@ -177,7 +177,7 @@ describe('triggerStopCallbacks', () => {
     expect(mockWriteFileSync).toHaveBeenCalledWith(
       '/tmp/test-test-session-123.md',
       expect.stringContaining('test-session-123'),
-      'utf-8'
+      { encoding: 'utf-8', mode: 0o600 }
     );
   });
 
@@ -199,7 +199,7 @@ describe('triggerStopCallbacks', () => {
     expect(mockWriteFileSync).toHaveBeenCalledWith(
       '/tmp/test.json',
       expect.stringContaining('"session_id"'),
-      'utf-8'
+      { encoding: 'utf-8', mode: 0o600 }
     );
   });
 
@@ -232,7 +232,7 @@ describe('triggerStopCallbacks', () => {
       stopHookCallbacks: {
         telegram: {
           enabled: true,
-          botToken: 'test-bot-token',
+          botToken: '123456789:ABCdefGHIjklMNOpqrSTUvwxyz012345678',
           chatId: '12345',
         },
       },
@@ -242,7 +242,7 @@ describe('triggerStopCallbacks', () => {
     await triggerStopCallbacks(metrics, testInput);
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://api.telegram.org/bottest-bot-token/sendMessage',
+      'https://api.telegram.org/bot123456789:ABCdefGHIjklMNOpqrSTUvwxyz012345678/sendMessage',
       expect.objectContaining({
         method: 'POST',
         body: expect.stringContaining('"chat_id":"12345"'),
@@ -352,7 +352,7 @@ describe('triggerStopCallbacks', () => {
       stopHookCallbacks: {
         telegram: {
           enabled: true,
-          botToken: 'bad-token',
+          botToken: '123456789:BADtokenABCdefGHIjklMNO012345678',
           chatId: '12345',
         },
       },
@@ -398,7 +398,7 @@ describe('triggerStopCallbacks', () => {
         },
         telegram: {
           enabled: true,
-          botToken: 'test-token',
+          botToken: '123456789:ABCdefGHIjklMNOpqrSTUvwxyz012345678',
           chatId: '12345',
         },
         discord: {

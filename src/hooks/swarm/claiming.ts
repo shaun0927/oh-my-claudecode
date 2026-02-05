@@ -556,9 +556,14 @@ function simpleGlobMatch(pattern: string, filePath: string): boolean {
   const normalizedPattern = pattern.replace(/\\/g, '/');
   const normalizedPath = filePath.replace(/\\/g, '/');
 
-  // Convert glob to regex
+  // Reject patterns that could cause ReDoS
+  if (normalizedPattern.length > 500 || /\*{3,}/.test(normalizedPattern)) {
+    return normalizedPattern === normalizedPath;
+  }
+
+  // Convert glob to regex safely
   const regexStr = normalizedPattern
-    .replace(/[.+^${}()|[\]]/g, '\\$&')  // Escape regex special chars (except * and ?)
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')  // Escape regex special chars (except * and ?)
     .replace(/\*\*/g, '{{GLOBSTAR}}')     // Placeholder for **
     .replace(/\*/g, '[^/]*')              // * matches anything except /
     .replace(/\?/g, '[^/]')              // ? matches single char except /
@@ -680,8 +685,18 @@ export function claimTaskForFiles(agentId: string, agentFilePatterns: string[]):
 
     // Find first task where files overlap with agent's scope
     for (const task of pendingTasks) {
-      const taskFiles = task.owned_files ? JSON.parse(task.owned_files) as string[] : [];
-      const taskPatterns = task.file_patterns ? JSON.parse(task.file_patterns) as string[] : [];
+      let taskFiles: string[] = [];
+      let taskPatterns: string[] = [];
+      try {
+        taskFiles = task.owned_files ? JSON.parse(task.owned_files) as string[] : [];
+      } catch {
+        // Skip tasks with corrupt owned_files JSON
+      }
+      try {
+        taskPatterns = task.file_patterns ? JSON.parse(task.file_patterns) as string[] : [];
+      } catch {
+        // Skip tasks with corrupt file_patterns JSON
+      }
 
       // Check if any task file matches any agent pattern
       const hasOverlap = [...taskFiles, ...taskPatterns].some(taskPath =>

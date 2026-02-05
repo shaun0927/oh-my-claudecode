@@ -6,7 +6,7 @@
  */
 
 import { writeFileSync, mkdirSync } from 'fs';
-import { dirname } from 'path';
+import { dirname, normalize, resolve } from 'path';
 import { homedir } from 'os';
 import type { SessionMetrics } from './index.js';
 import {
@@ -49,11 +49,14 @@ export function interpolatePath(pathTemplate: string, sessionId: string): string
   const date = now.toISOString().split('T')[0]; // YYYY-MM-DD
   const time = now.toISOString().split('T')[1].split('.')[0].replace(/:/g, '-'); // HH-MM-SS
 
-  return pathTemplate
+  // Sanitize session_id: remove path separators and traversal sequences
+  const safeSessionId = sessionId.replace(/[/\\..]/g, '_');
+
+  return normalize(pathTemplate
     .replace(/~/g, homedir())
-    .replace(/\{session_id\}/g, sessionId)
+    .replace(/\{session_id\}/g, safeSessionId)
     .replace(/\{date\}/g, date)
-    .replace(/\{time\}/g, time);
+    .replace(/\{time\}/g, time));
 }
 
 /**
@@ -71,8 +74,8 @@ async function writeToFile(
     // Ensure directory exists
     mkdirSync(dir, { recursive: true });
 
-    // Write file
-    writeFileSync(resolvedPath, content, 'utf-8');
+    // Write file with restricted permissions (owner read/write only)
+    writeFileSync(resolvedPath, content, { encoding: 'utf-8', mode: 0o600 });
     console.log(`[stop-callback] Session summary written to ${resolvedPath}`);
   } catch (error) {
     console.error('[stop-callback] File write failed:', error);
@@ -92,6 +95,12 @@ async function sendTelegram(
     return;
   }
 
+  // Validate bot token format (digits:alphanumeric)
+  if (!/^[0-9]+:[A-Za-z0-9_-]+$/.test(config.botToken)) {
+    console.error('[stop-callback] Telegram: invalid bot token format');
+    return;
+  }
+
   try {
     const url = `https://api.telegram.org/bot${config.botToken}/sendMessage`;
     const response = await fetch(url, {
@@ -102,16 +111,17 @@ async function sendTelegram(
         text: message,
         parse_mode: 'Markdown',
       }),
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Telegram API error: ${response.status} - ${errorText}`);
+      throw new Error(`Telegram API error: ${response.status} - ${response.statusText}`);
     }
 
     console.log('[stop-callback] Telegram notification sent');
   } catch (error) {
-    console.error('[stop-callback] Telegram send failed:', error);
+    // Don't log full error details which might contain the bot token
+    console.error('[stop-callback] Telegram send failed:', error instanceof Error ? error.message : 'Unknown error');
     // Don't throw - callback failures shouldn't block session end
   }
 }
@@ -128,6 +138,23 @@ async function sendDiscord(
     return;
   }
 
+  // Validate Discord webhook URL
+  try {
+    const url = new URL(config.webhookUrl);
+    const allowedHosts = ['discord.com', 'discordapp.com'];
+    if (!allowedHosts.some(host => url.hostname === host || url.hostname.endsWith(`.${host}`))) {
+      console.error('[stop-callback] Discord: webhook URL must be from discord.com or discordapp.com');
+      return;
+    }
+    if (url.protocol !== 'https:') {
+      console.error('[stop-callback] Discord: webhook URL must use HTTPS');
+      return;
+    }
+  } catch {
+    console.error('[stop-callback] Discord: invalid webhook URL');
+    return;
+  }
+
   try {
     const response = await fetch(config.webhookUrl, {
       method: 'POST',
@@ -135,16 +162,16 @@ async function sendDiscord(
       body: JSON.stringify({
         content: message,
       }),
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Discord webhook error: ${response.status} - ${errorText}`);
+      throw new Error(`Discord webhook error: ${response.status} - ${response.statusText}`);
     }
 
     console.log('[stop-callback] Discord notification sent');
   } catch (error) {
-    console.error('[stop-callback] Discord send failed:', error);
+    console.error('[stop-callback] Discord send failed:', error instanceof Error ? error.message : 'Unknown error');
     // Don't throw - callback failures shouldn't block session end
   }
 }

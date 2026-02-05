@@ -1,4 +1,14 @@
-#!/usr/bin/env node
+
+// Resolve global npm modules for native package imports
+try {
+  var _cp = require('child_process');
+  var _Module = require('module');
+  var _globalRoot = _cp.execSync('npm root -g', { encoding: 'utf8', timeout: 5000 }).trim();
+  if (_globalRoot) {
+    process.env.NODE_PATH = _globalRoot + (process.env.NODE_PATH ? ':' + process.env.NODE_PATH : '');
+    _Module._initPaths();
+  }
+} catch (_e) { /* npm not available - native modules will gracefully degrade */ }
 
 "use strict";
 var __create = Object.create;
@@ -2982,7 +2992,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve2.call(this, root, ref);
+      let _sch = resolve3.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3009,7 +3019,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve2(root, ref) {
+    function resolve3(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3584,7 +3594,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve2(baseURI, relativeURI, options) {
+    function resolve3(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const resolved = resolveComponent(parse3(baseURI, schemelessOptions), parse3(relativeURI, schemelessOptions), schemelessOptions, true);
       schemelessOptions.skipEscape = true;
@@ -3811,7 +3821,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve2,
+      resolve: resolve3,
       resolveComponent,
       equal,
       serialize,
@@ -12600,7 +12610,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve2) => setTimeout(resolve2, pollInterval));
+        await new Promise((resolve3) => setTimeout(resolve3, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -12617,7 +12627,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve2, reject) => {
+    return new Promise((resolve3, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -12695,7 +12705,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve2(parseResult.data);
+            resolve3(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -12956,12 +12966,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve2, reject) => {
+    return new Promise((resolve3, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve2, interval);
+      const timeoutId = setTimeout(resolve3, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -13690,20 +13700,21 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve2) => {
+    return new Promise((resolve3) => {
       const json = serializeMessage(message);
       if (this._stdout.write(json)) {
-        resolve2();
+        resolve3();
       } else {
-        this._stdout.once("drain", resolve2);
+        this._stdout.once("drain", resolve3);
       }
     });
   }
 };
 
-// src/mcp/gemini-standalone-server.ts
+// src/mcp/gemini-core.ts
 var import_child_process2 = require("child_process");
 var import_fs2 = require("fs");
+var import_path2 = require("path");
 
 // src/mcp/cli-detection.ts
 var import_child_process = require("child_process");
@@ -13797,25 +13808,35 @@ ${systemPrompt}
   return parts.join("\n\n");
 }
 
-// src/mcp/gemini-standalone-server.ts
-var GEMINI_DEFAULT_MODEL = process.env.OMC_GEMINI_DEFAULT_MODEL || "gemini-2.5-pro";
-var GEMINI_TIMEOUT = parseInt(process.env.OMC_GEMINI_TIMEOUT || "120000", 10);
+// src/mcp/gemini-core.ts
+var GEMINI_DEFAULT_MODEL = process.env.OMC_GEMINI_DEFAULT_MODEL || "gemini-3-pro-preview";
+var GEMINI_TIMEOUT = Math.min(Math.max(5e3, parseInt(process.env.OMC_GEMINI_TIMEOUT || "120000", 10) || 12e4), 3e5);
 var GEMINI_MODEL_FALLBACKS = [
+  "gemini-3-pro-preview",
+  "gemini-3-flash-preview",
   "gemini-2.5-pro",
-  "gemini-2.5-flash",
-  "gemini-2.0-flash"
+  "gemini-2.5-flash"
 ];
 var GEMINI_VALID_ROLES = ["designer", "executor"];
+var MAX_CONTEXT_FILES = 20;
+var MAX_FILE_SIZE = 5 * 1024 * 1024;
 function executeGemini(prompt, model) {
-  return new Promise((resolve2, reject) => {
+  return new Promise((resolve3, reject) => {
+    let settled = false;
     const args = ["--yolo"];
     if (model) {
       args.push("--model", model);
     }
     const child = (0, import_child_process2.spawn)("gemini", args, {
-      timeout: GEMINI_TIMEOUT,
       stdio: ["pipe", "pipe", "pipe"]
     });
+    const timeoutHandle = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        child.kill("SIGTERM");
+        reject(new Error(`Gemini timed out after ${GEMINI_TIMEOUT}ms`));
+      }
+    }, GEMINI_TIMEOUT);
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (data) => {
@@ -13825,88 +13846,91 @@ function executeGemini(prompt, model) {
       stderr += data.toString();
     });
     child.on("close", (code) => {
-      if (code === 0 || stdout.trim()) {
-        resolve2(stdout.trim());
-      } else {
-        reject(new Error(`Gemini exited with code ${code}: ${stderr || "No output"}`));
+      if (!settled) {
+        settled = true;
+        clearTimeout(timeoutHandle);
+        if (code === 0 || stdout.trim()) {
+          resolve3(stdout.trim());
+        } else {
+          reject(new Error(`Gemini exited with code ${code}: ${stderr || "No output"}`));
+        }
       }
     });
     child.on("error", (err) => {
-      reject(new Error(`Failed to spawn Gemini CLI: ${err.message}`));
+      if (!settled) {
+        settled = true;
+        clearTimeout(timeoutHandle);
+        child.kill("SIGTERM");
+        reject(new Error(`Failed to spawn Gemini CLI: ${err.message}`));
+      }
+    });
+    child.stdin.on("error", (err) => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timeoutHandle);
+        child.kill("SIGTERM");
+        reject(new Error(`Stdin write error: ${err.message}`));
+      }
     });
     child.stdin.write(prompt);
     child.stdin.end();
   });
 }
-var askGeminiTool = {
-  name: "ask_gemini",
-  description: `Send a prompt to Google Gemini CLI for design review or implementation validation. Gemini excels at analyzing large codebases with its 1M token context window. Requires agent_role to specify the perspective (designer or executor). Requires Gemini CLI (npm install -g @google/gemini-cli).`,
-  inputSchema: {
-    type: "object",
-    properties: {
-      prompt: { type: "string", description: "The prompt to send to Gemini" },
-      agent_role: {
-        type: "string",
-        enum: GEMINI_VALID_ROLES,
-        description: `Required. Agent perspective for Gemini: ${GEMINI_VALID_ROLES.join(", ")}. Gemini is optimized for design review and implementation tasks.`
-      },
-      model: { type: "string", description: `Gemini model to use (default: ${GEMINI_DEFAULT_MODEL}). Automatic fallback chain: ${GEMINI_MODEL_FALLBACKS.join(" \u2192 ")}` },
-      files: { type: "array", items: { type: "string" }, description: "File paths for Gemini to analyze (leverages 1M token context window)" }
-    },
-    required: ["prompt", "agent_role"]
+function validateAndReadFile(filePath) {
+  if (typeof filePath !== "string") {
+    return `--- File: ${filePath} --- (Invalid path type)`;
   }
-};
-var server = new Server(
-  {
-    name: "g",
-    version: "1.0.0"
-  },
-  {
-    capabilities: {
-      tools: {}
+  try {
+    const resolved = (0, import_path2.resolve)(filePath);
+    const stats = (0, import_fs2.statSync)(resolved);
+    if (!stats.isFile()) {
+      return `--- File: ${filePath} --- (Not a regular file)`;
     }
+    if (stats.size > MAX_FILE_SIZE) {
+      return `--- File: ${filePath} --- (File too large: ${(stats.size / 1024 / 1024).toFixed(1)}MB, max 5MB)`;
+    }
+    return `--- File: ${filePath} ---
+${(0, import_fs2.readFileSync)(resolved, "utf-8")}`;
+  } catch {
+    return `--- File: ${filePath} --- (Error reading file)`;
   }
-);
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return {
-    tools: [askGeminiTool]
-  };
-});
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-  if (name !== "ask_gemini") {
-    return {
-      content: [{ type: "text", text: `Unknown tool: ${name}` }],
-      isError: true
-    };
-  }
-  const { prompt, agent_role, model = GEMINI_DEFAULT_MODEL, files } = args ?? {};
+}
+async function handleAskGemini(args) {
+  const { prompt, agent_role, model = GEMINI_DEFAULT_MODEL, files } = args;
   if (!agent_role || !GEMINI_VALID_ROLES.includes(agent_role)) {
     return {
-      content: [{ type: "text", text: `Invalid agent_role: "${agent_role}". Gemini requires one of: ${GEMINI_VALID_ROLES.join(", ")}` }],
+      content: [{
+        type: "text",
+        text: `Invalid agent_role: "${agent_role}". Gemini requires one of: ${GEMINI_VALID_ROLES.join(", ")}`
+      }],
       isError: true
     };
   }
   const detection = detectGeminiCli();
   if (!detection.available) {
     return {
-      content: [{ type: "text", text: `Gemini CLI is not available: ${detection.error}
+      content: [{
+        type: "text",
+        text: `Gemini CLI is not available: ${detection.error}
 
-${detection.installHint}` }],
+${detection.installHint}`
+      }],
       isError: true
     };
   }
   const resolvedSystemPrompt = resolveSystemPrompt(void 0, agent_role);
   let fileContext;
   if (files && files.length > 0) {
-    fileContext = files.map((f) => {
-      try {
-        return `--- File: ${f} ---
-${(0, import_fs2.readFileSync)(f, "utf-8")}`;
-      } catch (err) {
-        return `--- File: ${f} --- (Error reading: ${err.message})`;
-      }
-    }).join("\n\n");
+    if (files.length > MAX_CONTEXT_FILES) {
+      return {
+        content: [{
+          type: "text",
+          text: `Too many context files (max ${MAX_CONTEXT_FILES}, got ${files.length})`
+        }],
+        isError: true
+      };
+    }
+    fileContext = files.map((f) => validateAndReadFile(f)).join("\n\n");
   }
   const fullPrompt = buildPromptWithSystemContext(prompt, fileContext, resolvedSystemPrompt);
   const requestedModel = model;
@@ -13921,18 +13945,58 @@ ${(0, import_fs2.readFileSync)(f, "utf-8")}`;
 
 ` : "";
       return {
-        content: [{ type: "text", text: `${prefix}${response}` }],
-        isError: false
+        content: [{
+          type: "text",
+          text: `${prefix}${response}`
+        }]
       };
     } catch (err) {
       errors.push(`${tryModel}: ${err.message}`);
     }
   }
   return {
-    content: [{ type: "text", text: `Gemini CLI error: all models failed.
-${errors.join("\n")}` }],
+    content: [{
+      type: "text",
+      text: `Gemini CLI error: all models failed.
+${errors.join("\n")}`
+    }],
     isError: true
   };
+}
+
+// src/mcp/gemini-standalone-server.ts
+var askGeminiTool = {
+  name: "ask_gemini",
+  description: `Send a prompt to Google Gemini CLI for design/implementation tasks. Gemini excels at frontend design review and implementation with its 1M token context window. Requires agent_role (${GEMINI_VALID_ROLES.join(", ")}). Fallback chain: ${GEMINI_MODEL_FALLBACKS.join(" \u2192 ")}. Requires Gemini CLI (npm install -g @google/gemini-cli).`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      agent_role: {
+        type: "string",
+        enum: GEMINI_VALID_ROLES,
+        description: `Required. Agent perspective for Gemini: ${GEMINI_VALID_ROLES.join(", ")}. Gemini is optimized for design/implementation tasks with large context.`
+      },
+      files: { type: "array", items: { type: "string" }, description: "File paths to include as context (contents will be prepended to prompt)" },
+      prompt: { type: "string", description: "The prompt to send to Gemini" },
+      model: { type: "string", description: `Gemini model to use (default: ${GEMINI_DEFAULT_MODEL}). Set OMC_GEMINI_DEFAULT_MODEL env var to change default. Auto-fallback chain: ${GEMINI_MODEL_FALLBACKS.join(" \u2192 ")}.` }
+    },
+    required: ["prompt", "agent_role"]
+  }
+};
+var server = new Server(
+  { name: "g", version: "1.0.0" },
+  { capabilities: { tools: {} } }
+);
+server.setRequestHandler(ListToolsRequestSchema, async () => ({
+  tools: [askGeminiTool]
+}));
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+  if (name !== "ask_gemini") {
+    return { content: [{ type: "text", text: `Unknown tool: ${name}` }], isError: true };
+  }
+  const { prompt, agent_role, model, files } = args ?? {};
+  return handleAskGemini({ prompt, agent_role, model, files });
 });
 async function main() {
   const transport = new StdioServerTransport();

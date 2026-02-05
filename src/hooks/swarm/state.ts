@@ -19,6 +19,19 @@ import type {
 import { DB_SCHEMA_VERSION } from "./types.js";
 
 /**
+ * Safe JSON.parse wrapper that returns defaultValue on failure
+ * instead of crashing with SyntaxError
+ */
+function safeJsonParse<T>(json: string | null | undefined, defaultValue: T | undefined): T | undefined {
+  if (!json) return defaultValue;
+  try {
+    return JSON.parse(json) as T;
+  } catch {
+    return defaultValue;
+  }
+}
+
+/**
  * SwarmSummary interface for the JSON sidecar
  */
 export interface SwarmSummary {
@@ -286,8 +299,8 @@ export function loadState(): SwarmState | null {
       result: row.result ?? undefined,
       priority: row.priority ?? 0,
       wave: row.wave ?? 1,
-      ownedFiles: row.owned_files ? JSON.parse(row.owned_files) : undefined,
-      filePatterns: row.file_patterns ? JSON.parse(row.file_patterns) : undefined,
+      ownedFiles: safeJsonParse<string[]>(row.owned_files, undefined),
+      filePatterns: safeJsonParse<string[]>(row.file_patterns, undefined),
     }));
 
     return {
@@ -439,8 +452,8 @@ export function getTasks(): SwarmTask[] {
       result: row.result ?? undefined,
       priority: row.priority ?? 0,
       wave: row.wave ?? 1,
-      ownedFiles: row.owned_files ? JSON.parse(row.owned_files) : undefined,
-      filePatterns: row.file_patterns ? JSON.parse(row.file_patterns) : undefined,
+      ownedFiles: safeJsonParse<string[]>(row.owned_files, undefined),
+      filePatterns: safeJsonParse<string[]>(row.file_patterns, undefined),
     }));
   } catch (error) {
     console.error("Failed to get tasks:", error);
@@ -482,8 +495,8 @@ export function getTasksByStatus(status: SwarmTask["status"]): SwarmTask[] {
       result: row.result ?? undefined,
       priority: row.priority ?? 0,
       wave: row.wave ?? 1,
-      ownedFiles: row.owned_files ? JSON.parse(row.owned_files) : undefined,
-      filePatterns: row.file_patterns ? JSON.parse(row.file_patterns) : undefined,
+      ownedFiles: safeJsonParse<string[]>(row.owned_files, undefined),
+      filePatterns: safeJsonParse<string[]>(row.file_patterns, undefined),
     }));
   } catch (error) {
     console.error("Failed to get tasks by status:", error);
@@ -525,8 +538,8 @@ export function getTasksByWave(wave: number): SwarmTask[] {
       result: row.result ?? undefined,
       priority: row.priority ?? 0,
       wave: row.wave ?? 1,
-      ownedFiles: row.owned_files ? JSON.parse(row.owned_files) : undefined,
-      filePatterns: row.file_patterns ? JSON.parse(row.file_patterns) : undefined,
+      ownedFiles: safeJsonParse<string[]>(row.owned_files, undefined),
+      filePatterns: safeJsonParse<string[]>(row.file_patterns, undefined),
     }));
   } catch (error) {
     console.error("Failed to get tasks by wave:", error);
@@ -542,7 +555,12 @@ export function getNextTaskId(): number {
   if (!db) return 1;
 
   try {
-    const stmt = db.prepare("SELECT MAX(CAST(SUBSTR(id, 6) AS INTEGER)) as maxId FROM tasks");
+    const stmt = db.prepare(`
+      SELECT MAX(CAST(SUBSTR(id, 6) AS INTEGER)) as maxId
+      FROM tasks
+      WHERE id LIKE 'task-%'
+        AND SUBSTR(id, 6) GLOB '[0-9]*'
+    `);
     const result = stmt.get() as { maxId: number | null };
     return (result?.maxId ?? 0) + 1;
   } catch (error) {
@@ -589,8 +607,8 @@ export function getTask(taskId: string): SwarmTask | null {
       result: row.result ?? undefined,
       priority: row.priority ?? 0,
       wave: row.wave ?? 1,
-      ownedFiles: row.owned_files ? JSON.parse(row.owned_files) : undefined,
-      filePatterns: row.file_patterns ? JSON.parse(row.file_patterns) : undefined,
+      ownedFiles: safeJsonParse<string[]>(row.owned_files, undefined),
+      filePatterns: safeJsonParse<string[]>(row.file_patterns, undefined),
     };
   } catch (error) {
     console.error("Failed to get task:", error);

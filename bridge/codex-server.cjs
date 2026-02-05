@@ -1,4 +1,14 @@
-#!/usr/bin/env node
+
+// Resolve global npm modules for native package imports
+try {
+  var _cp = require('child_process');
+  var _Module = require('module');
+  var _globalRoot = _cp.execSync('npm root -g', { encoding: 'utf8', timeout: 5000 }).trim();
+  if (_globalRoot) {
+    process.env.NODE_PATH = _globalRoot + (process.env.NODE_PATH ? ':' + process.env.NODE_PATH : '');
+    _Module._initPaths();
+  }
+} catch (_e) { /* npm not available - native modules will gracefully degrade */ }
 
 "use strict";
 var __create = Object.create;
@@ -2982,7 +2992,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve2.call(this, root, ref);
+      let _sch = resolve3.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3009,7 +3019,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve2(root, ref) {
+    function resolve3(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3584,7 +3594,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve2(baseURI, relativeURI, options) {
+    function resolve3(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const resolved = resolveComponent(parse3(baseURI, schemelessOptions), parse3(relativeURI, schemelessOptions), schemelessOptions, true);
       schemelessOptions.skipEscape = true;
@@ -3811,7 +3821,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve2,
+      resolve: resolve3,
       resolveComponent,
       equal,
       serialize,
@@ -12600,7 +12610,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve2) => setTimeout(resolve2, pollInterval));
+        await new Promise((resolve3) => setTimeout(resolve3, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -12617,7 +12627,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve2, reject) => {
+    return new Promise((resolve3, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -12695,7 +12705,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve2(parseResult.data);
+            resolve3(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -12956,12 +12966,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve2, reject) => {
+    return new Promise((resolve3, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve2, interval);
+      const timeoutId = setTimeout(resolve3, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -13690,20 +13700,21 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve2) => {
+    return new Promise((resolve3) => {
       const json = serializeMessage(message);
       if (this._stdout.write(json)) {
-        resolve2();
+        resolve3();
       } else {
-        this._stdout.once("drain", resolve2);
+        this._stdout.once("drain", resolve3);
       }
     });
   }
 };
 
-// src/mcp/codex-standalone-server.ts
+// src/mcp/codex-core.ts
 var import_child_process2 = require("child_process");
 var import_fs2 = require("fs");
+var import_path2 = require("path");
 
 // src/mcp/cli-detection.ts
 var import_child_process = require("child_process");
@@ -13797,10 +13808,12 @@ ${systemPrompt}
   return parts.join("\n\n");
 }
 
-// src/mcp/codex-standalone-server.ts
-var CODEX_DEFAULT_MODEL = process.env.OMC_CODEX_DEFAULT_MODEL || "gpt-4.1";
-var CODEX_TIMEOUT = parseInt(process.env.OMC_CODEX_TIMEOUT || "60000", 10);
-var CODEX_VALID_ROLES = ["architect", "planner", "critic"];
+// src/mcp/codex-core.ts
+var CODEX_DEFAULT_MODEL = process.env.OMC_CODEX_DEFAULT_MODEL || "gpt-5.2";
+var CODEX_TIMEOUT = Math.min(Math.max(5e3, parseInt(process.env.OMC_CODEX_TIMEOUT || "180000", 10) || 18e4), 6e5);
+var CODEX_VALID_ROLES = ["architect", "planner", "critic", "code-reviewer", "security-reviewer"];
+var MAX_CONTEXT_FILES = 20;
+var MAX_FILE_SIZE = 5 * 1024 * 1024;
 function parseCodexOutput(output) {
   const lines = output.trim().split("\n").filter((l) => l.trim());
   const messages = [];
@@ -13827,12 +13840,19 @@ function parseCodexOutput(output) {
   return messages.join("\n") || output;
 }
 function executeCodex(prompt, model) {
-  return new Promise((resolve2, reject) => {
+  return new Promise((resolve3, reject) => {
+    let settled = false;
     const args = ["exec", "-m", model, "--json", "--full-auto"];
     const child = (0, import_child_process2.spawn)("codex", args, {
-      timeout: CODEX_TIMEOUT,
       stdio: ["pipe", "pipe", "pipe"]
     });
+    const timeoutHandle = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        child.kill("SIGTERM");
+        reject(new Error(`Codex timed out after ${CODEX_TIMEOUT}ms`));
+      }
+    }, CODEX_TIMEOUT);
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (data) => {
@@ -13842,102 +13862,145 @@ function executeCodex(prompt, model) {
       stderr += data.toString();
     });
     child.on("close", (code) => {
-      if (code === 0 || stdout.trim()) {
-        resolve2(parseCodexOutput(stdout));
-      } else {
-        reject(new Error(`Codex exited with code ${code}: ${stderr || "No output"}`));
+      if (!settled) {
+        settled = true;
+        clearTimeout(timeoutHandle);
+        if (code === 0 || stdout.trim()) {
+          resolve3(parseCodexOutput(stdout));
+        } else {
+          reject(new Error(`Codex exited with code ${code}: ${stderr || "No output"}`));
+        }
       }
     });
     child.on("error", (err) => {
-      reject(new Error(`Failed to spawn Codex CLI: ${err.message}`));
+      if (!settled) {
+        settled = true;
+        clearTimeout(timeoutHandle);
+        child.kill("SIGTERM");
+        reject(new Error(`Failed to spawn Codex CLI: ${err.message}`));
+      }
+    });
+    child.stdin.on("error", (err) => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timeoutHandle);
+        child.kill("SIGTERM");
+        reject(new Error(`Stdin write error: ${err.message}`));
+      }
     });
     child.stdin.write(prompt);
     child.stdin.end();
   });
 }
-var askCodexTool = {
-  name: "ask_codex",
-  description: `Send a prompt to OpenAI Codex CLI for analytical/planning tasks. Codex excels at architecture review, planning validation, and critical analysis. Requires agent_role to specify the perspective (architect, planner, or critic). Requires Codex CLI (npm install -g @openai/codex).`,
-  inputSchema: {
-    type: "object",
-    properties: {
-      prompt: { type: "string", description: "The prompt to send to Codex" },
-      agent_role: {
-        type: "string",
-        enum: CODEX_VALID_ROLES,
-        description: `Required. Agent perspective for Codex: ${CODEX_VALID_ROLES.join(", ")}. Codex is optimized for analytical/planning tasks.`
-      },
-      model: { type: "string", description: `Codex model to use (default: ${CODEX_DEFAULT_MODEL}). Set OMC_CODEX_DEFAULT_MODEL env var to change default.` },
-      context_files: { type: "array", items: { type: "string" }, description: "File paths to include as context (contents will be prepended to prompt)" }
-    },
-    required: ["prompt", "agent_role"]
+function validateAndReadFile(filePath) {
+  if (typeof filePath !== "string") {
+    return `--- File: ${filePath} --- (Invalid path type)`;
   }
-};
-var server = new Server(
-  {
-    name: "x",
-    version: "1.0.0"
-  },
-  {
-    capabilities: {
-      tools: {}
+  try {
+    const resolved = (0, import_path2.resolve)(filePath);
+    const stats = (0, import_fs2.statSync)(resolved);
+    if (!stats.isFile()) {
+      return `--- File: ${filePath} --- (Not a regular file)`;
     }
+    if (stats.size > MAX_FILE_SIZE) {
+      return `--- File: ${filePath} --- (File too large: ${(stats.size / 1024 / 1024).toFixed(1)}MB, max 5MB)`;
+    }
+    return `--- File: ${filePath} ---
+${(0, import_fs2.readFileSync)(resolved, "utf-8")}`;
+  } catch {
+    return `--- File: ${filePath} --- (Error reading file)`;
   }
-);
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return {
-    tools: [askCodexTool]
-  };
-});
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-  if (name !== "ask_codex") {
-    return {
-      content: [{ type: "text", text: `Unknown tool: ${name}` }],
-      isError: true
-    };
-  }
-  const { prompt, agent_role, model = CODEX_DEFAULT_MODEL, context_files } = args ?? {};
+}
+async function handleAskCodex(args) {
+  const { prompt, agent_role, model = CODEX_DEFAULT_MODEL, context_files } = args;
   if (!agent_role || !CODEX_VALID_ROLES.includes(agent_role)) {
     return {
-      content: [{ type: "text", text: `Invalid agent_role: "${agent_role}". Codex requires one of: ${CODEX_VALID_ROLES.join(", ")}` }],
+      content: [{
+        type: "text",
+        text: `Invalid agent_role: "${agent_role}". Codex requires one of: ${CODEX_VALID_ROLES.join(", ")}`
+      }],
       isError: true
     };
   }
   const detection = detectCodexCli();
   if (!detection.available) {
     return {
-      content: [{ type: "text", text: `Codex CLI is not available: ${detection.error}
+      content: [{
+        type: "text",
+        text: `Codex CLI is not available: ${detection.error}
 
-${detection.installHint}` }],
+${detection.installHint}`
+      }],
       isError: true
     };
   }
   const resolvedSystemPrompt = resolveSystemPrompt(void 0, agent_role);
   let fileContext;
   if (context_files && context_files.length > 0) {
-    fileContext = context_files.map((f) => {
-      try {
-        return `--- File: ${f} ---
-${(0, import_fs2.readFileSync)(f, "utf-8")}`;
-      } catch (err) {
-        return `--- File: ${f} --- (Error reading: ${err.message})`;
-      }
-    }).join("\n\n");
+    if (context_files.length > MAX_CONTEXT_FILES) {
+      return {
+        content: [{
+          type: "text",
+          text: `Too many context files (max ${MAX_CONTEXT_FILES}, got ${context_files.length})`
+        }],
+        isError: true
+      };
+    }
+    fileContext = context_files.map((f) => validateAndReadFile(f)).join("\n\n");
   }
   const fullPrompt = buildPromptWithSystemContext(prompt, fileContext, resolvedSystemPrompt);
   try {
     const response = await executeCodex(fullPrompt, model);
     return {
-      content: [{ type: "text", text: response }],
-      isError: false
+      content: [{
+        type: "text",
+        text: response
+      }]
     };
   } catch (err) {
     return {
-      content: [{ type: "text", text: `Codex CLI error: ${err.message}` }],
+      content: [{
+        type: "text",
+        text: `Codex CLI error: ${err.message}`
+      }],
       isError: true
     };
   }
+}
+
+// src/mcp/codex-standalone-server.ts
+var askCodexTool = {
+  name: "ask_codex",
+  description: `Send a prompt to OpenAI Codex CLI for analytical/planning tasks. Codex excels at architecture review, planning validation, critical analysis, and code/security review validation. Requires agent_role to specify the perspective (${CODEX_VALID_ROLES.join(", ")}). Requires Codex CLI (npm install -g @openai/codex).`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      agent_role: {
+        type: "string",
+        enum: CODEX_VALID_ROLES,
+        description: `Required. Agent perspective for Codex: ${CODEX_VALID_ROLES.join(", ")}. Codex is optimized for analytical/planning tasks.`
+      },
+      context_files: { type: "array", items: { type: "string" }, description: "File paths to include as context (contents will be prepended to prompt)" },
+      prompt: { type: "string", description: "The prompt to send to Codex" },
+      model: { type: "string", description: `Codex model to use (default: ${CODEX_DEFAULT_MODEL}). Set OMC_CODEX_DEFAULT_MODEL env var to change default.` }
+    },
+    required: ["prompt", "agent_role"]
+  }
+};
+var server = new Server(
+  { name: "x", version: "1.0.0" },
+  { capabilities: { tools: {} } }
+);
+server.setRequestHandler(ListToolsRequestSchema, async () => ({
+  tools: [askCodexTool]
+}));
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+  if (name !== "ask_codex") {
+    return { content: [{ type: "text", text: `Unknown tool: ${name}` }], isError: true };
+  }
+  const { prompt, agent_role, model, context_files } = args ?? {};
+  return handleAskCodex({ prompt, agent_role, model, context_files });
 });
 async function main() {
   const transport = new StdioServerTransport();
