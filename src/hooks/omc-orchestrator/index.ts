@@ -34,6 +34,7 @@ import {
 } from '../notepad/index.js';
 import { logAuditEntry } from './audit.js';
 import { getWorktreeRoot } from '../../lib/worktree-paths.js';
+import { toForwardSlash } from '../../utils/paths.js';
 
 // Re-export constants
 export * from './constants.js';
@@ -127,14 +128,18 @@ interface GitFileStat {
  */
 export function isAllowedPath(filePath: string, directory?: string): boolean {
   if (!filePath) return true;
+  const normalized = toForwardSlash(filePath);
   // Fast path: check relative patterns first
-  if (ALLOWED_PATH_PATTERNS.some(pattern => pattern.test(filePath))) return true;
+  if (ALLOWED_PATH_PATTERNS.some(pattern => pattern.test(normalized))) return true;
   // Absolute path: normalize to relative by stripping worktree root
-  if (filePath.startsWith('/')) {
+  if (path.isAbsolute(filePath)) {
     const root = directory ? getWorktreeRoot(directory) : getWorktreeRoot();
-    if (root && filePath.startsWith(root + '/')) {
-      const relative = filePath.slice(root.length + 1);
-      return ALLOWED_PATH_PATTERNS.some(pattern => pattern.test(relative));
+    if (root) {
+      const normalizedRoot = toForwardSlash(root);
+      if (normalized.startsWith(normalizedRoot + '/')) {
+        const relative = toForwardSlash(path.relative(root, filePath));
+        return ALLOWED_PATH_PATTERNS.some(pattern => pattern.test(relative));
+      }
     }
     // If path is exactly the root, also check patterns
     if (root && filePath === root) {

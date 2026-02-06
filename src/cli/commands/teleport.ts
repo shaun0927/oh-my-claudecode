@@ -7,9 +7,9 @@
 
 import chalk from 'chalk';
 import { execSync, spawnSync } from 'child_process';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, rmSync } from 'fs';
 import { homedir } from 'os';
-import { join, basename } from 'path';
+import { join, basename, isAbsolute } from 'path';
 
 export interface TeleportOptions {
   worktree?: boolean;
@@ -374,16 +374,20 @@ export async function teleportListCommand(options: { json?: boolean }): Promise<
   }
 
   try {
-    const result = execSync(`find "${worktreeRoot}" -maxdepth 3 -name ".git" -type f`, {
+    const output = execSync('git worktree list --porcelain', {
+      cwd: worktreeRoot,
       encoding: 'utf-8',
-    });
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
 
-    const worktrees = result
-      .trim()
-      .split('\n')
-      .filter(Boolean)
-      .map(gitFile => {
-        const worktreePath = gitFile.replace('/.git', '');
+    // Parse porcelain output to extract worktree paths
+    const worktreePaths = output.split('\n')
+      .filter(line => line.startsWith('worktree '))
+      .map(line => line.replace('worktree ', ''));
+
+    const worktrees = worktreePaths
+      .filter(path => path.startsWith(worktreeRoot))
+      .map(worktreePath => {
         const relativePath = worktreePath.replace(worktreeRoot + '/', '');
 
         // Try to get branch name
@@ -438,7 +442,7 @@ export async function teleportRemoveCommand(
 
   // Resolve path - could be relative name or full path
   let worktreePath = pathOrName;
-  if (!pathOrName.startsWith('/')) {
+  if (!isAbsolute(pathOrName)) {
     worktreePath = join(worktreeRoot, pathOrName);
   }
 
@@ -501,7 +505,7 @@ export async function teleportRemoveCommand(
       });
     } else {
       // Fallback: just remove the directory
-      execSync(`rm -rf "${worktreePath}"`, { stdio: 'pipe' });
+      rmSync(worktreePath, { recursive: true, force: true });
     }
 
     if (options.json) {

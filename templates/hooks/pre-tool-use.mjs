@@ -16,9 +16,9 @@ const { readStdin } = await import(path.join(__dirname, 'lib', 'stdin.mjs'));
 
 // Allowed path patterns (no warning)
 const ALLOWED_PATH_PATTERNS = [
-  /\.omc\//,
-  /\.claude\//,
-  /\/\.claude\//,
+  /\.omc[/\\]/,
+  /\.claude[/\\]/,
+  /[/\\]\.claude[/\\]/,
   /CLAUDE\.md$/,
   /AGENTS\.md$/,
 ];
@@ -37,7 +37,9 @@ const SOURCE_EXTENSIONS = new Set([
 
 function isAllowedPath(filePath) {
   if (!filePath) return true;
-  return ALLOWED_PATH_PATTERNS.some(pattern => pattern.test(filePath));
+  // Normalize backslashes for Windows compatibility
+  const normalized = filePath.replace(/\\/g, '/');
+  return ALLOWED_PATH_PATTERNS.some(pattern => pattern.test(normalized));
 }
 
 function isSourceFile(filePath) {

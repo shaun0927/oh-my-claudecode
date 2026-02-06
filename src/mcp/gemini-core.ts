@@ -73,7 +73,8 @@ export function executeGemini(prompt: string, model?: string, cwd?: string): Pro
     }
     const child = spawn('gemini', args, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      ...(cwd ? { cwd } : {})
+      ...(cwd ? { cwd } : {}),
+      ...(process.platform === 'win32' ? { shell: true } : {})
     });
 
     const timeoutHandle = setTimeout(() => {
@@ -145,9 +146,10 @@ export function executeGeminiBackground(
       args.push('--model', model);
     }
     const child = spawn('gemini', args, {
-      detached: true,
+      detached: process.platform !== 'win32',
       stdio: ['pipe', 'pipe', 'pipe'],
-      ...(workingDirectory ? { cwd: workingDirectory } : {})
+      ...(workingDirectory ? { cwd: workingDirectory } : {}),
+      ...(process.platform === 'win32' ? { shell: true } : {})
     });
 
     if (!child.pid) {

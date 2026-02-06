@@ -8,8 +8,14 @@
 import { spawn, ChildProcess } from 'child_process';
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname, parse, join } from 'path';
+import { pathToFileURL } from 'url';
 import type { LspServerConfig } from './servers.js';
 import { getServerForFile, commandExists } from './servers.js';
+
+/** Convert a file path to a valid file:// URI (cross-platform) */
+function fileUri(filePath: string): string {
+  return pathToFileURL(resolve(filePath)).href;
+}
 
 // LSP Protocol Types
 export interface Position {
@@ -328,7 +334,7 @@ export class LspClient {
   private async initialize(): Promise<void> {
     await this.request('initialize', {
       processId: process.pid,
-      rootUri: `file://${this.workspaceRoot}`,
+      rootUri: pathToFileURL(this.workspaceRoot).href,
       rootPath: this.workspaceRoot,
       capabilities: {
         textDocument: {
@@ -354,7 +360,7 @@ export class LspClient {
    * Open a document for editing
    */
   async openDocument(filePath: string): Promise<void> {
-    const uri = `file://${resolve(filePath)}`;
+    const uri = fileUri(filePath);
 
     if (this.openDocuments.has(uri)) return;
 
@@ -384,7 +390,7 @@ export class LspClient {
    * Close a document
    */
   closeDocument(filePath: string): void {
-    const uri = `file://${resolve(filePath)}`;
+    const uri = fileUri(filePath);
 
     if (!this.openDocuments.has(uri)) return;
 
@@ -447,7 +453,7 @@ export class LspClient {
    */
   private async prepareDocument(filePath: string): Promise<string> {
     await this.openDocument(filePath);
-    return `file://${resolve(filePath)}`;
+    return fileUri(filePath);
   }
 
   // LSP Request Methods
@@ -507,7 +513,7 @@ export class LspClient {
    * Get diagnostics for a file
    */
   getDiagnostics(filePath: string): Diagnostic[] {
-    const uri = `file://${resolve(filePath)}`;
+    const uri = fileUri(filePath);
     return this.diagnostics.get(uri) || [];
   }
 

@@ -12,6 +12,7 @@ import { homedir } from 'os';
 import { join, dirname } from 'path';
 import * as jsonc from 'jsonc-parser';
 import type { PluginConfig } from '../shared/types.js';
+import { getConfigDir } from '../utils/paths.js';
 
 /**
  * Default configuration
@@ -88,7 +89,7 @@ export const DEFAULT_CONFIG: PluginConfig = {
  * Configuration file locations
  */
 export function getConfigPaths(): { user: string; project: string } {
-  const userConfigDir = process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config');
+  const userConfigDir = getConfigDir();
 
   return {
     user: join(userConfigDir, 'claude-sisyphus', 'config.jsonc'),

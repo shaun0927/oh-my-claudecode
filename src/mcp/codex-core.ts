@@ -139,7 +139,8 @@ export function executeCodex(prompt: string, model: string, cwd?: string): Promi
     const args = ['exec', '-m', model, '--json', '--full-auto'];
     const child = spawn('codex', args, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      ...(cwd ? { cwd } : {})
+      ...(cwd ? { cwd } : {}),
+      ...(process.platform === 'win32' ? { shell: true } : {})
     });
 
     // Manual timeout handling to ensure proper cleanup
@@ -272,9 +273,10 @@ export function executeCodexBackground(
       validateModelName(tryModel);
       const args = ['exec', '-m', tryModel, '--json', '--full-auto'];
       const child = spawn('codex', args, {
-        detached: true,
+        detached: process.platform !== 'win32',
         stdio: ['pipe', 'pipe', 'pipe'],
-        ...(workingDirectory ? { cwd: workingDirectory } : {})
+        ...(workingDirectory ? { cwd: workingDirectory } : {}),
+        ...(process.platform === 'win32' ? { shell: true } : {})
       });
 
       if (!child.pid) {

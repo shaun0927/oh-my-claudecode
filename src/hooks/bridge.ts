@@ -13,6 +13,7 @@
  * ```
  */
 
+import { pathToFileURL } from 'url';
 import { removeCodeBlocks, getAllKeywords } from "./keyword-detector/index.js";
 import {
   readRalphState,
@@ -857,7 +858,7 @@ export async function main(): Promise<void> {
 }
 
 // Run if called directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((err) => {
     console.error("[hook-bridge] Fatal error:", err);
     process.exit(1);
