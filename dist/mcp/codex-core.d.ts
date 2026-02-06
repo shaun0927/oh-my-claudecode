@@ -12,9 +12,17 @@ export declare function isSpawnedPid(pid: number): boolean;
 export declare function clearSpawnedPids(): void;
 export declare const CODEX_DEFAULT_MODEL: string;
 export declare const CODEX_TIMEOUT: number;
+export declare const CODEX_MODEL_FALLBACKS: string[];
 export declare const CODEX_VALID_ROLES: readonly ["architect", "planner", "critic", "analyst", "code-reviewer", "security-reviewer", "tdd-guide"];
 export declare const MAX_CONTEXT_FILES = 20;
 export declare const MAX_FILE_SIZE: number;
+/**
+ * Check if Codex JSONL output contains a model-not-found error
+ */
+export declare function isModelError(output: string): {
+    isError: boolean;
+    message: string;
+};
 /**
  * Parse Codex JSONL output to extract the final text response
  *
@@ -32,9 +40,18 @@ export declare function parseCodexOutput(output: string): string;
  */
 export declare function executeCodex(prompt: string, model: string, cwd?: string): Promise<string>;
 /**
- * Execute Codex CLI in background, writing status and response files upon completion
+ * Execute Codex CLI with model fallback chain
+ * Only falls back on model_not_found errors when model was not explicitly provided
  */
-export declare function executeCodexBackground(fullPrompt: string, model: string, jobMeta: BackgroundJobMeta, workingDirectory?: string): {
+export declare function executeCodexWithFallback(prompt: string, model: string | undefined, cwd?: string): Promise<{
+    response: string;
+    usedFallback: boolean;
+    actualModel: string;
+}>;
+/**
+ * Execute Codex CLI in background with fallback chain, writing status and response files upon completion
+ */
+export declare function executeCodexBackground(fullPrompt: string, modelInput: string | undefined, jobMeta: BackgroundJobMeta, workingDirectory?: string): {
     pid: number;
 } | {
     error: string;

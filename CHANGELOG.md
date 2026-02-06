@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.6] - 2026-02-06
+
+### Added
+
+- **Codex/GPT/Gemini magic-keyword MCP delegation** - New keyword detection for `ask codex`, `use gpt`, `delegate to gemini` that routes directly to MCP tools instead of skill invocation. Requires intent phrases to avoid false positives.
+- **Codex model fallback chain** - Automatic retry with fallback models (`gpt-5.3-codex` → `gpt-5.3` → `gpt-5.2-codex` → `gpt-5.2`) on model-not-found errors for both blocking and background execution.
+- **Full sanitization pipeline in TypeScript** - Ported XML tag, URL, file path, and code block stripping from runtime .mjs to TypeScript keyword detector for consistent false-positive prevention.
+
+### Fixed
+
+- **Background retry error handling** - Fixed silent error swallowing when model fallback retry fails in background execution, preventing jobs from getting stuck in "running" state.
+- **Redundant sanitization in keyword wrappers** - Removed double-processing where `hasKeyword`, `getAllKeywords`, and `getPrimaryKeyword` called `removeCodeBlocks` before `detectKeywordsWithType` which already calls `sanitizeForKeywordDetection`.
+
 ## [4.0.5] - 2026-02-05
 
 ### Changed

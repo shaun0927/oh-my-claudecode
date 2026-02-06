@@ -46,7 +46,9 @@ const KEYWORD_PATTERNS = {
     research: /\b(research)\b|\banalyze\s+data\b|\bstatistics\b/i,
     ultrathink: /\b(ultrathink|think hard|think deeply)\b/i,
     deepsearch: /\b(deepsearch)\b|\bsearch\s+(the\s+)?(codebase|code|files?|project)\b|\bfind\s+(in\s+)?(codebase|code|all\s+files?)\b/i,
-    analyze: /\b(deep\s*analyze)\b|\binvestigate\s+(the|this|why)\b|\bdebug\s+(the|this|why)\b/i
+    analyze: /\b(deep\s*analyze)\b|\binvestigate\s+(the|this|why)\b|\bdebug\s+(the|this|why)\b/i,
+    codex: /\b(ask|use|delegate\s+to)\s+(codex|gpt)\b/i,
+    gemini: /\b(ask|use|delegate\s+to)\s+gemini\b/i
 };
 /**
  * Priority order for keyword detection
@@ -55,7 +57,7 @@ const KEYWORD_PATTERNS = {
 const KEYWORD_PRIORITY = [
     'cancel', 'ralph', 'autopilot', 'ultrapilot', 'ultrawork', 'ecomode',
     'swarm', 'pipeline', 'ralplan', 'plan', 'tdd', 'research',
-    'ultrathink', 'deepsearch', 'analyze'
+    'ultrathink', 'deepsearch', 'analyze', 'codex', 'gemini'
 ];
 /**
  * Remove code blocks from text to prevent false positives
@@ -68,6 +70,27 @@ export function removeCodeBlocks(text) {
     // Remove inline code (single backticks)
     result = result.replace(/`[^`]+`/g, '');
     return result;
+}
+/**
+ * Sanitize text for keyword detection by removing XML tags, URLs, file paths,
+ * and code blocks to prevent false positives
+ */
+export function sanitizeForKeywordDetection(text) {
+    return text
+        // Strip XML-style tag blocks
+        .replace(/<(\w[\w-]*)[\s>][\s\S]*?<\/\1>/g, '')
+        // Strip self-closing XML tags
+        .replace(/<\w[\w-]*(?:\s[^>]*)?\s*\/>/g, '')
+        // Strip URLs
+        .replace(/https?:\/\/[^\s)>\]]+/g, '')
+        // Strip file paths — uses capture group + $1 replacement instead of lookbehind
+        // for broader engine compatibility (the .mjs runtime uses lookbehind instead)
+        .replace(/(^|[\s"'`(])(?:\/)?(?:[\w.-]+\/)+[\w.-]+/gm, '$1')
+        // Strip markdown code blocks
+        .replace(/```[\s\S]*?```/g, '')
+        .replace(/~~~[\s\S]*?~~~/g, '')
+        // Strip inline code
+        .replace(/`[^`]+`/g, '');
 }
 /**
  * Extract prompt text from message parts
@@ -83,7 +106,7 @@ export function extractPromptText(parts) {
  */
 export function detectKeywordsWithType(text, _agentName) {
     const detected = [];
-    const cleanedText = removeCodeBlocks(text);
+    const cleanedText = sanitizeForKeywordDetection(text);
     // Check for autopilot keywords
     const hasAutopilot = AUTOPILOT_KEYWORDS.some(kw => cleanedText.toLowerCase().includes(kw.toLowerCase()));
     // Check for autopilot phrase patterns
@@ -119,15 +142,13 @@ export function detectKeywordsWithType(text, _agentName) {
  * Check if text contains any magic keyword
  */
 export function hasKeyword(text) {
-    const cleanText = removeCodeBlocks(text);
-    return detectKeywordsWithType(cleanText).length > 0;
+    return detectKeywordsWithType(text).length > 0;
 }
 /**
  * Get all detected keywords with conflict resolution applied
  */
 export function getAllKeywords(text) {
-    const cleanText = removeCodeBlocks(text);
-    const detected = detectKeywordsWithType(cleanText);
+    const detected = detectKeywordsWithType(text);
     if (detected.length === 0)
         return [];
     let types = [...new Set(detected.map(d => d.type))];
@@ -156,8 +177,7 @@ export function getPrimaryKeyword(text) {
     // Get the highest priority keyword type
     const primaryType = allKeywords[0];
     // Find the original detected keyword for this type
-    const cleanText = removeCodeBlocks(text);
-    const detected = detectKeywordsWithType(cleanText);
+    const detected = detectKeywordsWithType(text);
     const match = detected.find(d => d.type === primaryType);
     return match || null;
 }
