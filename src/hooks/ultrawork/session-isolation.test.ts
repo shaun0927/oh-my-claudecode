@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import {
@@ -314,6 +314,118 @@ describe('Ultrawork Session Isolation (Issue #269)', () => {
       // Timestamps are ISO strings, compare as dates
       expect(new Date(updatedState?.last_checked_at || 0).getTime())
         .toBeGreaterThanOrEqual(new Date(initialTimestamp || 0).getTime());
+    });
+  });
+
+  describe('No legacy fallback with sessionId (Issue #311)', () => {
+    // Helper to create legacy state file directly
+    function createLegacyState(data: Record<string, unknown>) {
+      const stateDir = join(tempDir, '.omc', 'state');
+      mkdirSync(stateDir, { recursive: true });
+      writeFileSync(join(stateDir, 'ultrawork-state.json'), JSON.stringify(data, null, 2));
+    }
+
+    it('readUltraworkState with sessionId returns null when only legacy file exists', () => {
+      createLegacyState({
+        active: true,
+        started_at: new Date().toISOString(),
+        original_prompt: 'Legacy task',
+        session_id: 'session-A',
+        reinforcement_count: 0,
+        last_checked_at: new Date().toISOString()
+      });
+
+      // With sessionId, should NOT fall back to legacy file
+      const state = readUltraworkState(tempDir, 'session-A');
+      expect(state).toBeNull();
+
+      // Without sessionId, should still read legacy file
+      const legacyState = readUltraworkState(tempDir);
+      expect(legacyState).not.toBeNull();
+      expect(legacyState?.active).toBe(true);
+    });
+
+    it('readUltraworkState with sessionId rejects mismatched session_id in session file', () => {
+      // Activate as session-A
+      activateUltrawork('Task A', 'session-A', tempDir);
+
+      // Session-B should get null (no file for session-B)
+      expect(readUltraworkState(tempDir, 'session-B')).toBeNull();
+    });
+  });
+
+  describe('Ghost legacy cleanup on deactivate (Issue #311)', () => {
+    function createLegacyState(data: Record<string, unknown>) {
+      const stateDir = join(tempDir, '.omc', 'state');
+      mkdirSync(stateDir, { recursive: true });
+      writeFileSync(join(stateDir, 'ultrawork-state.json'), JSON.stringify(data, null, 2));
+    }
+
+    function legacyFileExists(): boolean {
+      return existsSync(join(tempDir, '.omc', 'state', 'ultrawork-state.json'));
+    }
+
+    function readLegacyState(): Record<string, unknown> | null {
+      const path = join(tempDir, '.omc', 'state', 'ultrawork-state.json');
+      if (!existsSync(path)) return null;
+      return JSON.parse(readFileSync(path, 'utf-8'));
+    }
+
+    it('should clean up legacy file with matching session_id on deactivate', () => {
+      // Create both session-scoped and legacy files for session-A
+      activateUltrawork('Task A', 'session-A', tempDir);
+      createLegacyState({
+        active: true,
+        session_id: 'session-A',
+        original_prompt: 'Ghost legacy'
+      });
+
+      expect(legacyFileExists()).toBe(true);
+
+      deactivateUltrawork(tempDir, 'session-A');
+
+      // Both session-scoped and legacy files should be cleaned
+      expect(legacyFileExists()).toBe(false);
+    });
+
+    it('should clean up legacy file with no session_id (orphaned)', () => {
+      activateUltrawork('Task A', 'session-A', tempDir);
+      createLegacyState({
+        active: true,
+        original_prompt: 'Orphaned legacy'
+        // Note: no session_id field
+      });
+
+      deactivateUltrawork(tempDir, 'session-A');
+
+      // Orphaned legacy file should be cleaned
+      expect(legacyFileExists()).toBe(false);
+    });
+
+    it('should NOT clean up legacy file belonging to another session', () => {
+      activateUltrawork('Task A', 'session-A', tempDir);
+      createLegacyState({
+        active: true,
+        session_id: 'session-B',
+        original_prompt: 'Session B legacy'
+      });
+
+      deactivateUltrawork(tempDir, 'session-A');
+
+      // Legacy file belongs to session-B, should NOT be deleted
+      expect(legacyFileExists()).toBe(true);
+      expect(readLegacyState()?.session_id).toBe('session-B');
+    });
+
+    it('should work correctly when no legacy file exists', () => {
+      activateUltrawork('Task A', 'session-A', tempDir);
+
+      // No legacy file created
+      expect(legacyFileExists()).toBe(false);
+
+      // Deactivate should succeed without error
+      const result = deactivateUltrawork(tempDir, 'session-A');
+      expect(result).toBe(true);
     });
   });
 });

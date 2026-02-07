@@ -68,23 +68,34 @@ function ensureStateDir(directory?: string, sessionId?: string): void {
 
 /**
  * Read Ultrawork state from disk (local only)
+ *
+ * When sessionId is provided, ONLY reads session-scoped file — no legacy fallback.
+ * This prevents cross-session state leakage.
  */
 export function readUltraworkState(directory?: string, sessionId?: string): UltraworkState | null {
-  // Try session-scoped path first
+  // When sessionId is provided, ONLY check session-scoped path — no legacy fallback.
   if (sessionId) {
     const sessionFile = getStateFilePath(directory, sessionId);
-    if (existsSync(sessionFile)) {
-      try {
-        const content = readFileSync(sessionFile, 'utf-8');
-        return JSON.parse(content);
-      } catch (error) {
-        console.error('[ultrawork] Failed to read session state file:', error);
-        // Fall through to legacy path
+    if (!existsSync(sessionFile)) {
+      return null;
+    }
+    try {
+      const content = readFileSync(sessionFile, 'utf-8');
+      const state: UltraworkState = JSON.parse(content);
+
+      // Validate session identity: state must belong to this session
+      if (state.session_id && state.session_id !== sessionId) {
+        return null;
       }
+
+      return state;
+    } catch (error) {
+      console.error('[ultrawork] Failed to read session state file:', error);
+      return null;
     }
   }
 
-  // Fallback to legacy path
+  // No sessionId: read legacy path (backward compat)
   const localStateFile = getStateFilePath(directory);
   if (existsSync(localStateFile)) {
     try {
@@ -138,19 +149,46 @@ export function activateUltrawork(
 
 /**
  * Deactivate ultrawork mode
+ *
+ * When sessionId is provided:
+ * 1. Deletes the session-scoped state file
+ * 2. Cleans up ghost legacy files that belong to this session (or have no session_id)
+ *    to prevent stale legacy files from leaking into other sessions.
  */
 export function deactivateUltrawork(directory?: string, sessionId?: string): boolean {
-  const localStateFile = getStateFilePath(directory, sessionId);
-  if (existsSync(localStateFile)) {
+  let success = true;
+
+  // Delete session-scoped state file
+  const stateFile = getStateFilePath(directory, sessionId);
+  if (existsSync(stateFile)) {
     try {
-      unlinkSync(localStateFile);
-      return true;
+      unlinkSync(stateFile);
     } catch {
-      return false;
+      success = false;
     }
   }
 
-  return true;
+  // Ghost legacy cleanup: if sessionId provided, also remove legacy file
+  // if it belongs to this session or has no session_id (orphaned)
+  if (sessionId) {
+    const legacyFile = getStateFilePath(directory); // no sessionId = legacy path
+    if (existsSync(legacyFile)) {
+      try {
+        const content = readFileSync(legacyFile, 'utf-8');
+        const legacyState = JSON.parse(content);
+
+        // Only remove if it belongs to this session or is unowned (no session_id)
+        if (!legacyState.session_id || legacyState.session_id === sessionId) {
+          unlinkSync(legacyFile);
+        }
+        // Do NOT delete another session's legacy data
+      } catch {
+        // If we can't read/parse, leave it alone
+      }
+    }
+  }
+
+  return success;
 }
 
 /**
