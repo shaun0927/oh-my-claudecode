@@ -1,3 +1,24 @@
+# oh-my-claudecode v4.1.1: Session Isolation & Flexible MCP Routing
+
+This patch release hardens session isolation for parallel workflows, unblocks flexible MCP agent routing, and enhances the setup wizard with agent teams configuration.
+
+---
+
+### Added
+
+- **Agent Teams Setup**: The `omc-setup` wizard now includes Step 5.5 to configure Claude Code's experimental Agent Teams (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`), including `teammateMode` selection and team defaults. (#484)
+
+### Changed
+
+- **Flexible MCP Routing**: Removed per-provider enum restriction on `agent_role` for `ask_codex` and `ask_gemini` MCP tools. Both now accept any valid agent role (~30 types); provider-specific strengths are documented as recommendations, not enforced gates. (#485)
+
+### Fixed
+
+- **Session State Isolation**: Eliminated cross-session state contamination when multiple Claude Code sessions run in the same directory. When `session_id` is known, legacy shared state is invisible — no fallback to shared paths. Adds `isSessionMatch()` helper for consistent session matching across all 8 modes. (#486)
+- **State Write Warnings**: Added warnings in MCP `state_write` when `session_id` is missing, preventing accidental shared-state writes. (#486)
+
+---
+
 # oh-my-claudecode v4.1.0: The Consolidation & Coordination Update
 
 This major release introduces a fundamental overhaul of the agent architecture, streamlines skills and commands, and rolls out a powerful new Team Coordination system for distributed, resilient multi-agent workflows.

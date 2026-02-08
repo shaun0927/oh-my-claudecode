@@ -21359,7 +21359,7 @@ var stateReadTool = {
   schema: {
     mode: external_exports.enum(STATE_TOOL_MODES).describe("The mode to read state for"),
     workingDirectory: external_exports.string().optional().describe("Working directory (defaults to cwd)"),
-    session_id: external_exports.string().optional().describe("Optional session ID for session-scoped state isolation. When provided, reads from session-scoped paths (.omc/state/sessions/{session_id}/). When omitted, reads from legacy shared paths.")
+    session_id: external_exports.string().optional().describe("Session ID for session-scoped state isolation. STRONGLY RECOMMENDED \u2014 prevents state leakage across parallel Claude Code sessions. When omitted, falls back to legacy shared path.")
   },
   handler: async (args) => {
     const { mode, workingDirectory, session_id } = args;
@@ -21431,11 +21431,15 @@ ${JSON.stringify(state, null, 2)}
             type: "text",
             text: `No state found for mode: ${mode}
 Expected legacy path: ${statePath}
-No active sessions found.`
+No active sessions found.
+
+Note: Reading from legacy/aggregate path (no session_id). This may include state from other sessions.`
           }]
         };
       }
       let output = `## State for ${mode}
+
+Note: Reading from legacy/aggregate path (no session_id). This may include state from other sessions.
 
 `;
       if (legacyExists) {
@@ -21516,7 +21520,7 @@ var stateWriteTool = {
     error: external_exports.string().optional().describe("Error message if the mode failed"),
     state: external_exports.record(external_exports.string(), external_exports.unknown()).optional().describe("Additional custom state fields (merged with explicit parameters)"),
     workingDirectory: external_exports.string().optional().describe("Working directory (defaults to cwd)"),
-    session_id: external_exports.string().optional().describe("Optional session ID for session-scoped state isolation. When provided, writes to session-scoped paths (.omc/state/sessions/{session_id}/). When omitted, writes to legacy shared paths.")
+    session_id: external_exports.string().optional().describe("Session ID for session-scoped state isolation. STRONGLY RECOMMENDED \u2014 prevents state leakage across parallel Claude Code sessions. When omitted, falls back to legacy shared path.")
   },
   handler: async (args) => {
     const {
@@ -21582,6 +21586,7 @@ var stateWriteTool = {
       };
       atomicWriteJsonSync(statePath, stateWithMeta);
       const sessionInfo = sessionId ? ` (session: ${sessionId})` : " (legacy path)";
+      const warningMessage = sessionId ? "" : "\n\nWARNING: No session_id provided. State written to legacy shared path which may leak across parallel sessions. Pass session_id for session-scoped isolation.";
       return {
         content: [{
           type: "text",
@@ -21590,7 +21595,7 @@ Path: ${statePath}
 
 \`\`\`json
 ${JSON.stringify(stateWithMeta, null, 2)}
-\`\`\``
+\`\`\`${warningMessage}`
         }]
       };
     } catch (error3) {
@@ -21609,7 +21614,7 @@ var stateClearTool = {
   schema: {
     mode: external_exports.enum(STATE_TOOL_MODES).describe("The mode to clear state for"),
     workingDirectory: external_exports.string().optional().describe("Working directory (defaults to cwd)"),
-    session_id: external_exports.string().optional().describe("Optional session ID for session-scoped state isolation. When provided, clears session-specific state. When omitted, clears from all locations (legacy + all sessions).")
+    session_id: external_exports.string().optional().describe("Session ID for session-scoped state isolation. STRONGLY RECOMMENDED \u2014 prevents state leakage across parallel Claude Code sessions. When omitted, falls back to legacy shared path.")
   },
   handler: async (args) => {
     const { mode, workingDirectory, session_id } = args;
@@ -21729,7 +21734,7 @@ var stateListActiveTool = {
   description: "List all currently active modes. Returns which modes have active state files.",
   schema: {
     workingDirectory: external_exports.string().optional().describe("Working directory (defaults to cwd)"),
-    session_id: external_exports.string().optional().describe("Optional session ID for session-scoped state isolation. When provided, shows modes active for that specific session. When omitted, shows all active modes across all sessions.")
+    session_id: external_exports.string().optional().describe("Session ID for session-scoped state isolation. STRONGLY RECOMMENDED \u2014 prevents state leakage across parallel Claude Code sessions. When omitted, falls back to legacy shared path.")
   },
   handler: async (args) => {
     const { workingDirectory, session_id } = args;
@@ -21845,7 +21850,7 @@ var stateGetStatusTool = {
   schema: {
     mode: external_exports.enum(STATE_TOOL_MODES).optional().describe("Specific mode to check (omit for all modes)"),
     workingDirectory: external_exports.string().optional().describe("Working directory (defaults to cwd)"),
-    session_id: external_exports.string().optional().describe("Optional session ID for session-scoped state isolation. When provided, includes session info in the status output. When omitted, shows status across all sessions.")
+    session_id: external_exports.string().optional().describe("Session ID for session-scoped state isolation. STRONGLY RECOMMENDED \u2014 prevents state leakage across parallel Claude Code sessions. When omitted, falls back to legacy shared path.")
   },
   handler: async (args) => {
     const { mode, workingDirectory, session_id } = args;
