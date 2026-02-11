@@ -60,9 +60,8 @@ function extractPrompt(input) {
     }
     return '';
   } catch {
-    // Fallback: try to extract with regex
-    const match = input.match(/"(?:prompt|content|text)"\s*:\s*"([^"]+)"/);
-    return match ? match[1] : '';
+    // Fail closed: don't risk false-positive keyword detection from malformed input
+    return '';
   }
 }
 
@@ -170,12 +169,7 @@ function linkRalphTeam(directory, sessionId) {
  */
 function isTeamEnabled() {
   try {
-    // Check env var first
-    if (process.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS === '1' ||
-        process.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS === 'true') {
-      return true;
-    }
-    // Check settings.json
+    // Check settings.json first (authoritative, user-controlled)
     const settingsPath = join(homedir(), '.claude', 'settings.json');
     if (existsSync(settingsPath)) {
       const settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
@@ -183,6 +177,11 @@ function isTeamEnabled() {
           settings.env?.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS === 'true') {
         return true;
       }
+    }
+    // Fallback: check env var (for dev/CI environments)
+    if (process.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS === '1' ||
+        process.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS === 'true') {
+      return true;
     }
     return false;
   } catch {
@@ -335,6 +334,11 @@ function resolveConflicts(matches) {
     resolved = resolved.filter(m => m.name !== 'autopilot');
   }
 
+  // Team beats ultrapilot (team is the canonical implementation)
+  if (names.includes('team') && names.includes('ultrapilot')) {
+    resolved = resolved.filter(m => m.name !== 'ultrapilot');
+  }
+
   // Ralph + Team coexist (team-ralph linked mode)
   // Both keywords are preserved so the skill can detect the composition.
 
@@ -409,10 +413,12 @@ async function main() {
       matches.push({ name: 'autopilot', args: '' });
     }
 
-    // Ultrapilot keywords
+    // Ultrapilot keywords (legacy names, routes to team via compatibility facade)
     if (/\b(ultrapilot|ultra-pilot)\b/i.test(cleanPrompt) ||
         /\bparallel\s+build\b/i.test(cleanPrompt) ||
-        /\bswarm\s+build\b/i.test(cleanPrompt)) {
+        /\bswarm\s+build\b/i.test(cleanPrompt) ||
+        /\bswarm\s+\d+\s+agents?\b/i.test(cleanPrompt) ||
+        /\bcoordinated\s+agents\b/i.test(cleanPrompt)) {
       matches.push({ name: 'ultrapilot', args: '' });
     }
 
@@ -426,16 +432,12 @@ async function main() {
       matches.push({ name: 'ecomode', args: '' });
     }
 
-    // Team keywords (including legacy ultrapilot/swarm phrases)
-    const swarmMatch = cleanPrompt.match(/\bswarm\s+(\d+)\s+agents?\b/i);
-    const hasTeamKeyword = /\b(team)\b/i.test(cleanPrompt) || /\bcoordinated\s+team\b/i.test(cleanPrompt);
-    const hasLegacyTeamKeyword = /\b(ultrapilot|ultra-pilot)\b/i.test(cleanPrompt) ||
-      /\bparallel\s+build\b/i.test(cleanPrompt) ||
-      /\bswarm\s+build\b/i.test(cleanPrompt) ||
-      !!swarmMatch ||
-      /\bcoordinated\s+agents\b/i.test(cleanPrompt);
-    if (hasTeamKeyword || hasLegacyTeamKeyword) {
-      matches.push({ name: 'team', args: swarmMatch ? swarmMatch[1] : '' });
+    // Team keywords (intent-gated to prevent false positives on bare "team")
+    // Uses negative lookbehind to exclude possessive/article contexts like "my team", "the team"
+    const hasTeamKeyword = /(?<!\b(?:my|the|our|a|his|her|their|its)\s)\bteam\b/i.test(cleanPrompt) ||
+      /\bcoordinated\s+team\b/i.test(cleanPrompt);
+    if (hasTeamKeyword && isTeamEnabled()) {
+      matches.push({ name: 'team', args: '' });
     }
 
     // Pipeline keywords
@@ -502,8 +504,18 @@ async function main() {
       return;
     }
 
+    // Deduplicate matches by keyword name before conflict resolution
+    const seen = new Set();
+    const uniqueMatches = [];
+    for (const m of matches) {
+      if (!seen.has(m.name)) {
+        seen.add(m.name);
+        uniqueMatches.push(m);
+      }
+    }
+
     // Resolve conflicts
-    const resolved = resolveConflicts(matches);
+    const resolved = resolveConflicts(uniqueMatches);
 
     // Import flow tracer once (best-effort)
     let tracer = null;
@@ -573,20 +585,16 @@ async function main() {
     const skillMatches = resolved.filter(m => !MCP_KEYWORDS.includes(m.name));
     const delegationMatches = resolved.filter(m => MCP_KEYWORDS.includes(m.name));
 
-    // Check if team skill is being invoked and add warning if feature not enabled
-    const hasTeamSkill = skillMatches.some(m => m.name === 'team');
-    const teamWarning = hasTeamSkill && !isTeamEnabled() ? createTeamWarning() + '\n\n---\n\n' : '';
-
     if (skillMatches.length > 0 && delegationMatches.length > 0) {
       // Combined: skills + MCP delegations
-      console.log(JSON.stringify(createHookOutput(teamWarning + createCombinedOutput(skillMatches, delegationMatches, prompt))));
+      console.log(JSON.stringify(createHookOutput(createCombinedOutput(skillMatches, delegationMatches, prompt))));
     } else if (delegationMatches.length > 0) {
       // MCP delegation only
       const delegationParts = delegationMatches.map(d => createMcpDelegation(d.name, prompt));
       console.log(JSON.stringify(createHookOutput(delegationParts.join('\n\n---\n\n'))));
     } else {
       // Skills only (existing behavior)
-      console.log(JSON.stringify(createHookOutput(teamWarning + createMultiSkillInvocation(skillMatches, prompt))));
+      console.log(JSON.stringify(createHookOutput(createMultiSkillInvocation(skillMatches, prompt))));
     }
   } catch (error) {
     // On any error, allow continuation

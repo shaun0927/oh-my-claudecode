@@ -194,6 +194,8 @@ state_write(mode="team", active=true, current_phase="team-plan", state={
   "max_fix_loops": "3",
   "linked_ralph": "false",
   "stage_history": "team-plan"
+  // Note: state_write accepts string values; consumers should coerce
+  // agent_count, fix_loop_count, max_fix_loops to numbers on read
 })
 ```
 
@@ -204,12 +206,12 @@ state_write(mode="team", active=true, current_phase="team-plan", state={
 | `active` | boolean | Whether team mode is active |
 | `current_phase` | string | Current pipeline stage: `team-plan`, `team-prd`, `team-exec`, `team-verify`, `team-fix` |
 | `team_name` | string | Slug name for the team |
-| `agent_count` | string | Number of worker agents |
+| `agent_count` | number | Number of worker agents |
 | `agent_types` | string | Comma-separated agent types used in team-exec |
 | `task` | string | Original task description |
-| `fix_loop_count` | string | Current fix iteration count |
-| `max_fix_loops` | string | Maximum fix iterations before failing (default: 3) |
-| `linked_ralph` | string | Whether team is linked to a ralph persistence loop |
+| `fix_loop_count` | number | Current fix iteration count |
+| `max_fix_loops` | number | Maximum fix iterations before failing (default: 3) |
+| `linked_ralph` | boolean | Whether team is linked to a ralph persistence loop |
 | `stage_history` | string | Comma-separated list of stage transitions with timestamps |
 
 **Update state on every stage transition:**
