@@ -170,7 +170,7 @@ export async function render(context: HudRenderContext, config: HudConfig): Prom
 
   // Model name
   if (enabledElements.model && context.modelName) {
-    const modelElement = renderModel(context.modelName);
+    const modelElement = renderModel(context.modelName, enabledElements.modelFormat);
     if (modelElement) gitElements.push(modelElement);
   }
 
