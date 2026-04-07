@@ -258,6 +258,9 @@ export function readLog(root: string): string | null {
 
 /** Write a wiki page to disk. MUST be called inside withWikiLock. */
 export function writePageUnsafe(root: string, page: WikiPage): void {
+  if (RESERVED_FILES.has(page.filename)) {
+    throw new Error(`Cannot write to reserved wiki file: ${page.filename}`);
+  }
   const wikiDir = ensureWikiDir(root);
   const filePath = safeWikiPath(wikiDir, page.filename);
   if (!filePath) throw new Error(`Invalid wiki page filename: ${page.filename}`);
@@ -370,9 +373,27 @@ export function appendLog(root: string, entry: WikiLogEntry): void {
 
 /** Convert a title to a filename slug. */
 export function titleToSlug(title: string): string {
-  return title
+  const base = title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
-    .slice(0, 64) + '.md';
+    .slice(0, 64);
+
+  // Fallback for titles with no latin/numeric characters (CJK, Cyrillic, etc.)
+  if (!base) {
+    // Use a simple hash of the title to generate a deterministic slug
+    let hash = 0;
+    for (let i = 0; i < title.length; i++) {
+      hash = ((hash << 5) - hash + title.charCodeAt(i)) | 0;
+    }
+    const hexHash = Math.abs(hash).toString(16).padStart(8, '0');
+    return `page-${hexHash}.md`;
+  }
+
+  // Prevent collision with reserved wiki files
+  if (RESERVED_FILES.has(`${base}.md`)) {
+    return `${base}-page.md`;
+  }
+
+  return `${base}.md`;
 }
